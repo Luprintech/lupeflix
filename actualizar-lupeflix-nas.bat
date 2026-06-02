@@ -11,7 +11,6 @@ set "NAS_TARGET=%NAS_USER%@%NAS_HOST%"
 set "NAS_PATH=/volume1/docker/lupeflix"
 set "REMOTE_URL=https://github.com/Luprintech/lupeflix.git"
 set "BRANCH=main"
-set "COMPOSE_COMMAND=docker compose up -d --build"
 
 cls
 echo ============================================================
@@ -32,32 +31,10 @@ if errorlevel 1 (
   goto :fail
 )
 
-if not exist ".env" (
-  echo ERROR: No existe el archivo .env junto a este BAT.
-  echo Sin .env Docker Compose no puede cargar la configuracion real.
-  goto :fail
-)
-
-echo ^> Actualizando codigo en el NAS desde GitHub...
-ssh -p %NAS_PORT% %NAS_TARGET% "set -e; APP_PATH='%NAS_PATH%'; REMOTE_URL='%REMOTE_URL%'; BRANCH='%BRANCH%'; TMP_PATH=\"/tmp/lupeflix-clone-$(date +%%Y%%m%%d%%H%%M%%S)\"; if [ -d \"$APP_PATH/.git\" ]; then cd \"$APP_PATH\"; git fetch origin \"$BRANCH\"; git reset --hard \"origin/$BRANCH\"; else rm -rf \"$TMP_PATH\"; git clone --branch \"$BRANCH\" \"$REMOTE_URL\" \"$TMP_PATH\"; if [ -d \"$APP_PATH\" ]; then backup_path=\"$APP_PATH.backup.$(date +%%Y%%m%%d%%H%%M%%S)\"; mv \"$APP_PATH\" \"$backup_path\"; echo \"Existing app folder moved to: $backup_path\"; fi; mv \"$TMP_PATH\" \"$APP_PATH\"; fi"
+echo ^> Descargando ultimos cambios de GitHub y haciendo redeploy en el NAS...
+ssh -p %NAS_PORT% %NAS_TARGET% "set -e; APP_PATH='%NAS_PATH%'; REMOTE_URL='%REMOTE_URL%'; BRANCH='%BRANCH%'; DOCKER=''; for p in /usr/local/bin/docker /var/packages/ContainerManager/target/usr/bin/docker /volume1/@appstore/ContainerManager/usr/bin/docker docker; do if command -v \"$p\" >/dev/null 2>&1 || [ -x \"$p\" ]; then DOCKER=\"$p\"; break; fi; done; if [ -z \"$DOCKER\" ]; then echo 'ERROR: docker no encontrado en el NAS'; exit 1; fi; if [ ! -d \"$APP_PATH/.git\" ]; then echo 'ERROR: La carpeta no es un repo Git: '$APP_PATH; echo 'Clonalo una vez en el NAS o borra la carpeta para permitir clone.'; exit 1; fi; cd \"$APP_PATH\"; git fetch origin \"$BRANCH\"; git reset --hard \"origin/$BRANCH\"; if [ ! -f .env ]; then echo 'ERROR: Falta .env en '$APP_PATH; exit 1; fi; \"$DOCKER\" compose up -d --build; echo; echo 'LupeFlix status:'; \"$DOCKER\" compose ps; echo; echo 'Healthcheck:'; if command -v curl >/dev/null 2>&1; then curl -fsS http://127.0.0.1:3030/api/health || true; else wget -qO- http://127.0.0.1:3030/api/health || true; fi; echo"
 if errorlevel 1 (
-  echo ERROR: No se pudo actualizar el codigo en el NAS.
-  goto :fail
-)
-
-echo.
-echo ^> Copiando .env al NAS sin scp...
-type ".env" | ssh -p %NAS_PORT% %NAS_TARGET% "tr -d '\r' > '%NAS_PATH%/.env'"
-if errorlevel 1 (
-  echo ERROR: No se pudo copiar .env al NAS por SSH.
-  goto :fail
-)
-
-echo.
-echo ^> Ejecutando Docker Compose en el NAS...
-ssh -p %NAS_PORT% %NAS_TARGET% "set -e; cd '%NAS_PATH%'; %COMPOSE_COMMAND%; echo; echo 'LupeFlix status:'; docker compose ps; echo; echo 'Healthcheck:'; if command -v curl >/dev/null 2>&1; then curl -fsS http://127.0.0.1:3030/api/health || true; else wget -qO- http://127.0.0.1:3030/api/health || true; fi; echo"
-if errorlevel 1 (
-  echo ERROR: Docker Compose fallo en el NAS.
+  echo ERROR: Fallo la actualizacion/redeploy en el NAS.
   goto :fail
 )
 
