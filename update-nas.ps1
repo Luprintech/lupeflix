@@ -49,7 +49,7 @@ fi
 "@
 
 Write-Host "`n> Preparing repository folder on NAS" -ForegroundColor Cyan
-$prepareScript | & ssh -p $NasPort $sshTarget "cat > /tmp/lupeflix-prepare.sh && sh /tmp/lupeflix-prepare.sh"
+$prepareScript | & ssh -p $NasPort $sshTarget "tr -d '\r' > /tmp/lupeflix-prepare.sh && sh /tmp/lupeflix-prepare.sh"
 if ($LASTEXITCODE -ne 0) { throw "NAS repository preparation failed" }
 
 # Keep secrets out of GitHub. Copy the local .env to the NAS after the folder exists.
@@ -87,8 +87,9 @@ echo
 "@
 
 Write-Host "`n> Pulling latest code and redeploying on NAS" -ForegroundColor Cyan
-$deployScript | & ssh -p $NasPort $sshTarget "cat > /tmp/lupeflix-deploy.sh && sh /tmp/lupeflix-deploy.sh"
+$deployScript | & ssh -p $NasPort $sshTarget "tr -d '\r' > /tmp/lupeflix-deploy.sh && sh /tmp/lupeflix-deploy.sh"
 if ($LASTEXITCODE -ne 0) { throw "NAS update/redeploy failed" }
 
 Write-Host "`nNAS update completed: http://$NasHost`:3030" -ForegroundColor Green
+
 
