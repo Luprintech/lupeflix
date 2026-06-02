@@ -29,19 +29,10 @@ Write-Host "NAS:     $NasUser@$NasHost`:$NasPort"
 Write-Host "Path:    $NasPath"
 
 $sshTarget = "$NasUser@$NasHost"
-
-# Keep secrets out of GitHub. Copy the local .env to the NAS before compose uses it.
-if (Test-Path (Join-Path $ProjectRoot ".env")) {
-  Write-Host "`n> Copying .env to NAS" -ForegroundColor Cyan
-  & scp -P $NasPort "$ProjectRoot\.env" "${sshTarget}:$NasPath/.env"
-  if ($LASTEXITCODE -ne 0) { throw "Failed to copy .env to NAS" }
-} else {
-  Write-Host "WARNING: local .env not found. NAS must already have $NasPath/.env" -ForegroundColor Yellow
-}
-
 $composeCommand = if ($NoBuild) { "docker compose up -d" } else { "docker compose up -d --build" }
 
-$remoteScript = @"
+# First ensure the application folder exists on the NAS and contains the Git repo.
+$prepareScript = @"
 set -e
 REMOTE_URL='$RemoteUrl'
 BRANCH='$Branch'
@@ -55,6 +46,25 @@ if [ ! -d "`$APP_PATH/.git" ]; then
   fi
   git clone "`$REMOTE_URL" "`$APP_PATH"
 fi
+"@
+
+Write-Host "`n> Preparing repository folder on NAS" -ForegroundColor Cyan
+$prepareScript | & ssh -p $NasPort $sshTarget "cat > /tmp/lupeflix-prepare.sh && sh /tmp/lupeflix-prepare.sh"
+if ($LASTEXITCODE -ne 0) { throw "NAS repository preparation failed" }
+
+# Keep secrets out of GitHub. Copy the local .env to the NAS after the folder exists.
+if (Test-Path (Join-Path $ProjectRoot ".env")) {
+  Write-Host "`n> Copying .env to NAS" -ForegroundColor Cyan
+  & scp -P $NasPort "$ProjectRoot\.env" "${sshTarget}:$NasPath/.env"
+  if ($LASTEXITCODE -ne 0) { throw "Failed to copy .env to NAS" }
+} else {
+  Write-Host "WARNING: local .env not found. NAS must already have $NasPath/.env" -ForegroundColor Yellow
+}
+
+$deployScript = @"
+set -e
+BRANCH='$Branch'
+APP_PATH='$NasPath'
 
 cd "`$APP_PATH"
 git fetch origin "`$BRANCH"
@@ -76,8 +86,8 @@ fi
 echo
 "@
 
-Write-Host "`n> Updating code and redeploying on NAS" -ForegroundColor Cyan
-$remoteScript | & ssh -p $NasPort $sshTarget "cat > /tmp/lupeflix-update-and-deploy.sh && sh /tmp/lupeflix-update-and-deploy.sh"
+Write-Host "`n> Pulling latest code and redeploying on NAS" -ForegroundColor Cyan
+$deployScript | & ssh -p $NasPort $sshTarget "cat > /tmp/lupeflix-deploy.sh && sh /tmp/lupeflix-deploy.sh"
 if ($LASTEXITCODE -ne 0) { throw "NAS update/redeploy failed" }
 
 Write-Host "`nNAS update completed: http://$NasHost`:3030" -ForegroundColor Green
