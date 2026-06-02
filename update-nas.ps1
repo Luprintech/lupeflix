@@ -4,7 +4,7 @@
   [string]$NasUser = "lupe",
   [string]$NasHost = "192.168.1.91",
   [int]$NasPort = 91,
-  [string]$NasPath = "/home/lupe/lupeflix",
+  [string]$NasPath = "/volume1/docker/lupeflix",
   [switch]$NoBuild
 )
 
@@ -91,3 +91,4 @@ $deployScript | & ssh -p $NasPort $sshTarget "cat > /tmp/lupeflix-deploy.sh && s
 if ($LASTEXITCODE -ne 0) { throw "NAS update/redeploy failed" }
 
 Write-Host "`nNAS update completed: http://$NasHost`:3030" -ForegroundColor Green
+

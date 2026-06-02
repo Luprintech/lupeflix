@@ -4,7 +4,7 @@
   [string]$NasUser = "lupe",
   [string]$NasHost = "192.168.1.91",
   [int]$NasPort = 91,
-  [string]$NasPath = "/home/lupe/lupeflix",
+  [string]$NasPath = "/volume1/docker/lupeflix",
   [switch]$NoBuild
 )
 
@@ -23,3 +23,4 @@ if ($NoBuild) { $argsList += '-NoBuild' }
 
 & powershell @argsList
 exit $LASTEXITCODE
+
