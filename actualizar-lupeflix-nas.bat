@@ -1,63 +1,35 @@
 @echo off
-setlocal EnableExtensions
+cd /d "C:\Users\guada\Desktop\PROYECTOS WEB\lupeflix"
 
-cd /d "%~dp0"
-title LupeFlix - Actualizar NAS y redeploy
-
-cls
-echo ============================================================
-echo  LupeFlix - Actualizar NAS desde GitHub y redeploy Docker
-echo ============================================================
 echo.
-echo  Este lanzador ejecuta actualizar-lupeflix-git.sh con Git Bash.
-echo  La ventana se quedara abierta al terminar para ver errores.
+echo ==============================================
+echo   LupeFlix - Deploy al NAS
+echo ==============================================
 echo.
 
-set "SCRIPT=%~dp0actualizar-lupeflix-git.sh"
-
-if not exist "%SCRIPT%" (
-  echo ERROR: No existe actualizar-lupeflix-git.sh junto a este BAT.
-  goto :fail
-)
-
-set "BASH_EXE="
-if exist "C:\Program Files\Git\bin\bash.exe" set "BASH_EXE=C:\Program Files\Git\bin\bash.exe"
-if exist "C:\Program Files\Git\usr\bin\bash.exe" set "BASH_EXE=C:\Program Files\Git\usr\bin\bash.exe"
-if exist "C:\Program Files (x86)\Git\bin\bash.exe" set "BASH_EXE=C:\Program Files (x86)\Git\bin\bash.exe"
-
-if "%BASH_EXE%"=="" (
-  where bash >nul 2>nul
-  if errorlevel 1 (
-    echo ERROR: No se encontro Git Bash/bash en este equipo.
-    echo Instala Git for Windows o ejecuta manualmente actualizar-lupeflix-git.sh desde Git Bash.
-    goto :fail
-  )
-  set "BASH_EXE=bash"
-)
-
-echo ^> Ejecutando deploy con: %BASH_EXE%
-echo.
-"%BASH_EXE%" "%SCRIPT%"
-
-if errorlevel 1 (
-  echo.
-  echo ERROR: Fallo la actualizacion/redeploy en el NAS.
-  goto :fail
+echo [1/2] Subiendo cambios a GitHub...
+git push origin main
+if %errorlevel% neq 0 (
+    echo ERROR: Fallo al hacer push a GitHub
+    pause
+    exit /b 1
 )
 
 echo.
-echo ============================================================
-echo  LupeFlix actualizado correctamente.
-echo ============================================================
+echo [2/2] Desplegando en el NAS...
+echo.
+
+ssh -p 91 lupe@192.168.1.91 "cd /volume1/docker/lupeflix && git restore . && git pull origin main && if [ ! -f .env ]; then echo ERROR: Falta .env en /volume1/docker/lupeflix; exit 1; fi && /usr/local/bin/docker compose down && /usr/local/bin/docker compose build --no-cache && /usr/local/bin/docker compose up -d && /usr/local/bin/docker compose ps && /usr/local/bin/docker compose logs lupeflix --tail 20"
+
+if %errorlevel% neq 0 (
+    echo ERROR: Fallo el deploy en el NAS
+    pause
+    exit /b 1
+)
+
+echo.
+echo ==============================================
+echo   Listo! https://lupeflix.luprintech.com
+echo ==============================================
 echo.
 pause
-exit /b 0
-
-:fail
-echo.
-echo ============================================================
-echo  ERROR: La actualizacion fallo.
-echo ============================================================
-echo.
-pause
-exit /b 1
