@@ -773,3 +773,136 @@ a { text-decoration: none; color: inherit; }
   .ep-thumb { width: 104px; height: 58px; }
   .ep-desc { -webkit-line-clamp: 1; }
 }
+
+/* SERIES MODAL CRITICAL OVERRIDES - keep at file end to beat stale/modal legacy rules */
+#seriesModal .series-backdrop-vignette {
+  display: none !important;
+  pointer-events: none !important;
+}
+#seriesModal .series-backdrop::after {
+  pointer-events: none !important;
+}
+#seriesModal .series-info,
+#seriesModal .episodes-panel {
+  position: relative !important;
+  z-index: 20 !important;
+}
+#seriesModal .series-btns {
+  position: relative !important;
+  z-index: 200 !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+#seriesModal .series-btns > button,
+#seriesModal #seriesFav,
+#seriesModal #seriesLater,
+#seriesModal #seriesIdentify {
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  filter: none !important;
+  cursor: pointer !important;
+  position: relative !important;
+  z-index: 201 !important;
+}
+#seriesModal #seriesFav,
+#seriesModal #seriesLater {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  border-radius: 999px !important;
+  border: 2px solid rgba(255,255,255,0.68) !important;
+  background: rgba(42,42,42,0.96) !important;
+  color: #fff !important;
+}
+#seriesModal #seriesFav:hover,
+#seriesModal #seriesLater:hover {
+  border-color: #fff !important;
+  background: rgba(255,255,255,0.18) !important;
+  transform: scale(1.06) !important;
+}
+#seriesModal #seriesFav.fav-active {
+  background: #e50914 !important;
+  border-color: #e50914 !important;
+}
+#seriesModal #seriesLater.later-active {
+  background: #1f6fb2 !important;
+  border-color: #4aa3ff !important;
+}
+#seriesModal .season-toolbar {
+  align-items: center !important;
+}
+#seriesModal .season-toolbar h3 {
+  color: #fff !important;
+  opacity: 1 !important;
+}
+#seriesModal .season-dropdown {
+  position: relative !important;
+  z-index: 180 !important;
+  min-width: 250px !important;
+}
+#seriesModal .season-dropdown-btn {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  border: 1px solid rgba(255,255,255,0.52) !important;
+  border-radius: 5px !important;
+  background: #202020 !important;
+  color: #fff !important;
+  padding: 0 15px !important;
+  font: inherit !important;
+  font-weight: 800 !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.42) !important;
+}
+#seriesModal .season-dropdown-menu {
+  display: none !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: calc(100% + 8px) !important;
+  width: min(320px, 82vw) !important;
+  max-height: 340px !important;
+  overflow-y: auto !important;
+  padding: 6px !important;
+  border-radius: 7px !important;
+  border: 1px solid rgba(255,255,255,0.24) !important;
+  background: rgba(15,15,15,0.98) !important;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.78) !important;
+}
+#seriesModal .season-dropdown.open .season-dropdown-menu {
+  display: block !important;
+}
+#seriesModal .season-option {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: rgba(255,255,255,0.84) !important;
+  padding: 13px 12px !important;
+  font: inherit !important;
+  font-weight: 800 !important;
+  text-align: left !important;
+}
+#seriesModal .season-option:hover,
+#seriesModal .season-option.active {
+  background: rgba(255,255,255,0.14) !important;
+  color: #fff !important;
+}
+#seriesModal .season-option small {
+  color: rgba(255,255,255,0.58) !important;
+  font-size: 0.74rem !important;
+  font-weight: 700 !important;
+}
