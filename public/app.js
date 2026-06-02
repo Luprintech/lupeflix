@@ -588,7 +588,6 @@ async function showSeriesModal(key) {
   openOverlay('seriesOverlay');
   document.getElementById('seriesTitle').textContent = '...';
   document.getElementById('episodeList').innerHTML = '<p style="color:rgba(255,255,255,0.4);padding:20px">Cargando...</p>';
-  document.getElementById('seasonTabs').innerHTML = '';
   document.getElementById('seasonSelect').innerHTML = '';
   document.getElementById('seasonSummary').textContent = 'Cargando temporadas...';
 
@@ -609,14 +608,13 @@ async function showSeriesModal(key) {
 
     // Fav/later for series (using first episode id as proxy)
     const firstEp = Object.values(data.seasons)[0]?.[0];
+    const favBtn   = document.getElementById('seriesFav');
+    const laterBtn = document.getElementById('seriesLater');
+    favBtn.classList.remove('fav-active');
+    laterBtn.classList.remove('later-active');
+    favBtn.onclick = null;
+    laterBtn.onclick = null;
     if (firstEp) {
-      const playBtn = document.getElementById('seriesPlayFirst');
-      if (playBtn) {
-        playBtn.style.display = firstEp.file_path ? 'flex' : 'none';
-        playBtn.onclick = () => { closeOverlay('seriesOverlay'); play(firstEp.id, firstEp.episode_title || firstEp.title || data.series_title); };
-      }
-      const favBtn   = document.getElementById('seriesFav');
-      const laterBtn = document.getElementById('seriesLater');
       getFavState(firstEp.id).then(s => {
         favBtn.classList.toggle('fav-active', !!s.is_favorite);
         laterBtn.classList.toggle('later-active', !!s.in_watchlist);
@@ -650,15 +648,10 @@ async function showSeriesModal(key) {
     }
 
     const seasons = Object.keys(data.seasons).sort((a, b) => +a - +b);
-    const tabsEl  = document.getElementById('seasonTabs');
     const selectEl = document.getElementById('seasonSelect');
-    tabsEl.innerHTML = seasons.map((s, i) =>
-      `<button class="season-tab ${i === 0 ? 'active' : ''}" data-s="${s}">Temporada ${s} <span style="opacity:.5;font-size:0.7rem">(${data.seasons[s].length})</span></button>`
-    ).join('');
     selectEl.innerHTML = seasons.map(s => `<option value="${s}">Temporada ${s} (${data.seasons[s].length})</option>`).join('');
 
     function showSeason(sn) {
-      tabsEl.querySelectorAll('.season-tab').forEach(t => t.classList.toggle('active', t.dataset.s === String(sn)));
       if (selectEl.value !== String(sn)) selectEl.value = String(sn);
       const eps = data.seasons[sn] || [];
       document.getElementById('seasonSummary').textContent = `${eps.length} episodios disponibles en la temporada ${sn}`;
@@ -690,7 +683,6 @@ async function showSeriesModal(key) {
       });
     }
 
-    tabsEl.querySelectorAll('.season-tab').forEach(t => t.addEventListener('click', () => showSeason(t.dataset.s)));
     selectEl.onchange = () => showSeason(selectEl.value);
     if (seasons.length) showSeason(seasons[0]);
 
