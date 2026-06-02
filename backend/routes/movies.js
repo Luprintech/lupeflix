@@ -29,22 +29,40 @@ function inLibraryByTmdbIds(ids) {
 }
 
 // LIST
+// Helper: clause that isolates proper standalone movies (not episodic content mis-tagged as movie)
+const MOVIE_ONLY_CLAUSE = `
+  type = 'movie'
+  AND (season_number IS NULL OR season_number < 1)
+  AND (series_title  IS NULL OR series_title  = '')
+  AND (episode_number IS NULL OR episode_number < 1)
+`;
+
 router.get('/', (req, res) => {
   const { type, genre, search, limit = 50, offset = 0 } = req.query;
   let query  = 'SELECT * FROM movies WHERE 1=1';
   const params = [];
 
-  if (type && type !== 'all') { query += ' AND type = ?'; params.push(type); }
+  if (type === 'movie') {
+    // Strict: standalone films only, exclude mis-tagged episodic content
+    query += ` AND ${MOVIE_ONLY_CLAUSE}`;
+  } else if (type && type !== 'all') {
+    query += ' AND type = ?'; params.push(type);
+  }
+
   if (genre)  { query += ' AND genres LIKE ?'; params.push(`%${genre}%`); }
   if (search) { query += ' AND (title LIKE ? OR original_title LIKE ? OR series_title LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
 
   query += ' ORDER BY added_at DESC LIMIT ? OFFSET ?';
   params.push(Number(limit), Number(offset));
 
-  const rows  = db.prepare(query).all(...params);
-  const totalQuery = type && type !== 'all'
+  const rows = db.prepare(query).all(...params);
+
+  const totalQuery = type === 'movie'
+    ? db.prepare(`SELECT COUNT(*) as count FROM movies WHERE ${MOVIE_ONLY_CLAUSE}`).get().count
+    : type && type !== 'all'
     ? db.prepare('SELECT COUNT(*) as count FROM movies WHERE type = ?').get(type).count
     : db.prepare('SELECT COUNT(*) as count FROM movies').get().count;
+
   res.json({ results: rows, total: totalQuery });
 });
 
@@ -138,8 +156,13 @@ router.get('/top', (req, res) => {
 
   let query = 'SELECT * FROM movies WHERE rating IS NOT NULL AND rating > 0';
   const params = [];
-  if (type) { query += ' AND type = ?'; params.push(type); }
-  else       { query += " AND type IN ('movie','documentary')"; }
+  if (type === 'movie') {
+    query += ` AND ${MOVIE_ONLY_CLAUSE}`;
+  } else if (type) {
+    query += ' AND type = ?'; params.push(type);
+  } else {
+    query += " AND type IN ('movie','documentary')";
+  }
   query += ' ORDER BY rating DESC LIMIT ?';
   params.push(n);
   res.json(db.prepare(query).all(...params));

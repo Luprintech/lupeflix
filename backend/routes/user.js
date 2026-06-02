@@ -93,9 +93,25 @@ router.delete('/history/:movie_id', requireUser, (req, res) => {
 
 // ── RECOMMENDATIONS (content-based filtering) ──
 
+const MOVIE_STRICT = `type = 'movie' AND (season_number IS NULL OR season_number < 1) AND (series_title IS NULL OR series_title = '') AND (episode_number IS NULL OR episode_number < 1)`;
+
+function dedupeItems(items, n) {
+  const seen = new Set();
+  const out  = [];
+  for (const m of items) {
+    const key = m.tmdb_id ? `id:${m.tmdb_id}` : `t:${String(m.title || '').toLowerCase().slice(0, 60)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(m);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+
 // GET /api/user/recommendations?type=movie|tv|documentary&limit=24
 router.get('/recommendations', requireUser, (req, res) => {
   const { type, limit = 24 } = req.query;
+  const n = Number(limit);
 
   const watched = db.prepare(`
     SELECT m.id, m.genres, m.director
@@ -111,37 +127,34 @@ router.get('/recommendations', requireUser, (req, res) => {
     (w.director || '').split(',').forEach(d => { const k = d.trim(); if (k) dirFreq[k] = (dirFreq[k] || 0) + 1; });
   }
 
-  const buildBase = (extra = '') => {
+  const buildBase = (orderBy = 'ORDER BY rating DESC, views DESC') => {
     let q = 'SELECT * FROM movies WHERE 1=1';
     const p = [];
     if (watchedIds.length) { q += ` AND id NOT IN (${watchedIds.map(() => '?').join(',')})`, p.push(...watchedIds); }
-    if (type) { q += ' AND type = ?'; p.push(type); }
-    q += ` ${extra} LIMIT 500`;
+    if (type === 'movie') { q += ` AND ${MOVIE_STRICT}`; }
+    else if (type) { q += ' AND type = ?'; p.push(type); }
+    q += ` ${orderBy} LIMIT 1000`;
     return db.prepare(q).all(...p);
   };
 
   if (!watchedIds.length || !Object.keys(genreFreq).length) {
-    const rows = buildBase('ORDER BY rating DESC, views DESC');
-    return res.json(rows.slice(0, Number(limit)));
+    return res.json(dedupeItems(buildBase(), n));
   }
 
   const candidates = buildBase('ORDER BY added_at DESC');
-  const topGenres  = Object.keys(genreFreq);
-
   const scored = candidates
     .filter(m => (m.genres || '').split(',').some(g => genreFreq[g.trim()]))
     .map(m => {
       let s = 0;
-      (m.genres   || '').split(',').forEach(g => { const f = genreFreq[g.trim()];   if (f) s += f * 10; });
-      (m.director || '').split(',').forEach(d => { const f = dirFreq[d.trim()];     if (f) s += f * 5; });
+      (m.genres   || '').split(',').forEach(g => { const f = genreFreq[g.trim()]; if (f) s += f * 10; });
+      (m.director || '').split(',').forEach(d => { const f = dirFreq[d.trim()];   if (f) s += f * 5; });
       s += (m.rating || 0) * 2;
       s += Math.log1p(m.views || 0);
       return { ...m, _score: s };
     })
-    .sort((a, b) => b._score - a._score)
-    .slice(0, Number(limit));
+    .sort((a, b) => b._score - a._score);
 
-  res.json(scored);
+  res.json(dedupeItems(scored, n));
 });
 
 // GET /api/user/because-watched?type=...&limit=24
