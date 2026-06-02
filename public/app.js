@@ -367,7 +367,7 @@ async function renderTypeHome(type) {
     isSer ? get('/series', { limit: 24 }) : get('/movies', { type, limit: 24 }),
     isSer ? get('/movies/top', { type: 'tv', limit: 24 }) : get('/movies/top', { type, limit: 24 }),
     fetch(`/api/user/because-watched?type=${type}&limit=24`, { headers: auth() }).then(r => r.json()).catch(() => ({ title: null, items: [] })),
-    isSer ? get('/series', { limit: 300 }) : get('/movies', { type, limit: 300 }),
+    isSer ? get('/series', { limit: 1000 }) : get('/movies', { type, limit: 1000 }),
   ]);
 
   const fill = (el, title, items, isSeries = false, isTop = false) => {

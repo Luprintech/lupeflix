@@ -142,11 +142,12 @@ router.post('/ids-missing', requireAdmin, (req, res) => {
   res.json({ ok: true, count: ids.length, ids });
 });
 
-// POST /api/rematch/:id/auto — auto-find TMDB and apply metadata for items without it
+// POST /api/rematch/:id/auto — auto-find and APPLY (bulk fill, accepts force=true)
 router.post('/:id/auto', requireAdmin, async (req, res) => {
   const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
   if (!movie) return res.status(404).json({ error: 'Not found' });
-  if (movie.tmdb_id) return res.json({ ok: true, skipped: true, title: movie.title });
+  const force = String(req.query.force || req.body?.force) === 'true';
+  if (movie.tmdb_id && !force) return res.json({ ok: true, skipped: true, title: movie.title });
   try {
     const found = await autoFindOnTmdb(movie);
     if (!found) return res.json({ ok: false, not_found: true, title: movie.title });
@@ -155,6 +156,75 @@ router.post('/:id/auto', requireAdmin, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/rematch/:id/auto-search — search TMDB without applying; shows candidates
+// Strategy: series_title → title → title-no-year → English fallback
+router.post('/:id/auto-search', requireAdmin, async (req, res) => {
+  const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
+  if (!movie) return res.status(404).json({ error: 'Not found' });
+
+  const isTv      = movie.type === 'tv';
+  const mediaType = isTv ? 'tv' : 'movie';
+  const endpoint  = `/search/${mediaType}`;
+
+  // Build ordered query candidates
+  const queries = [];
+  if (isTv && movie.series_title) queries.push(...titleCandidates(movie.series_title));
+  queries.push(...titleCandidates(movie.title || movie.original_title || ''));
+  if (movie.original_title && movie.original_title !== movie.title)
+    queries.push(...titleCandidates(movie.original_title));
+  const unique = [...new Set(queries)].filter(Boolean);
+
+  const results = [];
+  const seen    = new Set();
+
+  async function search(q, year, lang) {
+    try {
+      const params = { query: q };
+      if (year) params.year = year;
+      const data = await tmdb(endpoint, lang, params);
+      for (const r of (data.results || []).slice(0, 5)) {
+        if (seen.has(r.id) || results.length >= 6) continue;
+        seen.add(r.id);
+        results.push({
+          id: r.id, media_type: mediaType,
+          title: r.title || r.name || '',
+          year:  parseInt((r.release_date || r.first_air_date || '').slice(0, 4)) || null,
+          poster_path:   r.poster_path   || null,
+          vote_average:  r.vote_average  || null,
+        });
+      }
+    } catch {}
+  }
+
+  // Pass 1: with year in Spanish
+  for (const q of unique) {
+    await search(q, movie.year, 'es-ES');
+    if (results.length >= 6) break;
+  }
+  // Pass 2: without year in Spanish
+  if (results.length < 4) {
+    for (const q of unique) {
+      await search(q, null, 'es-ES');
+      if (results.length >= 6) break;
+    }
+  }
+  // Pass 3: English fallback
+  if (results.length < 4) {
+    for (const q of unique) {
+      await search(q, movie.year, 'en-US');
+      await search(q, null,       'en-US');
+      if (results.length >= 6) break;
+    }
+  }
+
+  res.json({
+    results,
+    media_type:     mediaType,
+    original_title: movie.title,
+    searched_as:    unique[0] || '',
+  });
 });
 
 // POST /api/rematch/:id/identify ? set TMDB ID manually and refresh metadata.

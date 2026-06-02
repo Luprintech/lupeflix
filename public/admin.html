@@ -6,7 +6,7 @@
   <title>LupeFlix — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="admin.css?v=20260602-7" />
+  <link rel="stylesheet" href="admin.css?v=20260603-1" />
 </head>
 <body>
 
@@ -283,17 +283,29 @@
         <div class="form-group"><label>TMDB ID</label><input type="number" name="tmdb_id" /></div>
         <div class="form-group span2"><label>Ruta del archivo</label><input type="text" name="file_path" /></div>
       </div>
-      <div id="editMatchBox" class="metadata-admin-box" style="display:none">
-        <div class="tmdb-search-row">
-          <input type="text" id="editMatchQuery" class="search-input" placeholder="Buscar t?tulo en TMDB" />
-          <select id="editMatchType" class="select-input" style="width:140px"><option value="movie">Película</option><option value="tv">Serie</option><option value="documentary">Documental</option></select>
-          <button type="button" id="editMatchSearch" class="btn-primary">Buscar</button>
+      <!-- Metadata identify panel -->
+      <div id="editIdentifyPanel" class="metadata-admin-box" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-size:0.82rem;font-weight:600;color:var(--muted)">Identificar metadatos</span>
+          <button type="button" id="autoIdentifyBtn" class="btn-primary btn-sm">🔍 Auto-identificar</button>
         </div>
-        <div id="editMatchResults" class="tmdb-results"></div>
+        <div id="autoIdentifyStatus" style="display:none;margin-bottom:10px;font-size:0.8rem;padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.04)"></div>
+        <div id="editMatchResults" class="tmdb-results" style="margin-bottom:12px"></div>
+        <div style="padding-top:10px;border-top:1px solid var(--border)">
+          <p class="muted" style="margin-bottom:8px;font-size:0.75rem">Búsqueda manual:</p>
+          <div class="tmdb-search-row">
+            <input type="text" id="editMatchQuery" class="search-input" placeholder="Título en TMDB..." />
+            <select id="editMatchType" class="select-input" style="width:130px">
+              <option value="movie">Película</option>
+              <option value="tv">Serie</option>
+            </select>
+            <button type="button" id="editMatchSearch" class="btn-primary">Buscar</button>
+          </div>
+        </div>
       </div>
       <div id="editError" class="error-msg" style="display:none"></div>
       <div class="form-actions">
-        <button type="button" id="editIdentifyBtn" class="btn-primary">Identificar metadatos</button>
+        <button type="button" id="editIdentifyBtn" class="btn-primary">🔍 Identificar metadatos</button>
         <button type="button" id="editRematchBtn" class="btn-ghost" title="Re-descarga metadata desde TMDB en español (requiere TMDB ID)">🌐 Actualizar a Castellano</button>
         <button type="submit" class="btn-primary">💾 Guardar cambios</button>
         <button type="button" id="deleteBtn" class="btn-danger">🗑 Eliminar</button>
@@ -305,7 +317,7 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="admin.js?v=20260602-6"></script>
+<script src="admin.js?v=20260603-1"></script>
 </body>
 </html>
 

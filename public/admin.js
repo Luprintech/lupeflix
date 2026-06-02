@@ -426,6 +426,11 @@ window.setFilePath = (p) => {
 
 // ── EDIT MODAL ──
 let currentEditMovie = null;
+
+function setIdentifyType(m) {
+  document.getElementById('editMatchType').value = m.type === 'tv' ? 'tv' : 'movie';
+}
+
 async function openEdit(id, openMatcher = false) {
   try {
     const m = await apiFetch(`/movies/${id}`);
@@ -434,42 +439,94 @@ async function openEdit(id, openMatcher = false) {
     Object.keys(m).forEach(k => { if (form.elements[k]) form.elements[k].value = m[k] ?? ''; });
     document.getElementById('deleteBtn').onclick = () => deleteMovie(id, m.title);
     document.getElementById('editOverlay').style.display = 'flex';
-    document.getElementById('editMatchBox').style.display = openMatcher ? 'block' : 'none';
-    document.getElementById('editMatchQuery').value = m.title || '';
-    document.getElementById('editMatchType').value = m.type === 'tv' ? 'tv' : m.type === 'documentary' ? 'documentary' : 'movie';
+    document.getElementById('editIdentifyPanel').style.display = openMatcher ? 'block' : 'none';
+    document.getElementById('autoIdentifyStatus').style.display = 'none';
+    document.getElementById('editMatchQuery').value = m.series_title || m.title || '';
+    setIdentifyType(m);
     document.getElementById('editMatchResults').innerHTML = '';
-    if (openMatcher) searchEditMatches();
+    if (openMatcher) triggerAutoIdentify();
   } catch { showToast('Error al cargar'); }
 }
 
+// Open identify panel + auto-search
 document.getElementById('editIdentifyBtn').addEventListener('click', () => {
   if (!currentEditMovie) return;
-  document.getElementById('editMatchBox').style.display = 'block';
-  document.getElementById('editMatchQuery').value = currentEditMovie.title || '';
-  document.getElementById('editMatchType').value = currentEditMovie.type === 'tv' ? 'tv' : currentEditMovie.type === 'documentary' ? 'documentary' : 'movie';
-  searchEditMatches();
+  document.getElementById('editIdentifyPanel').style.display = 'block';
+  document.getElementById('editMatchQuery').value = currentEditMovie.series_title || currentEditMovie.title || '';
+  setIdentifyType(currentEditMovie);
+  triggerAutoIdentify();
 });
+
+// Auto-identify: calls backend smart search, shows candidates
+document.getElementById('autoIdentifyBtn').addEventListener('click', triggerAutoIdentify);
+
+async function triggerAutoIdentify() {
+  if (!currentEditMovie) return;
+  const btn    = document.getElementById('autoIdentifyBtn');
+  const status = document.getElementById('autoIdentifyStatus');
+  const el     = document.getElementById('editMatchResults');
+  btn.disabled = true; btn.textContent = '⏳ Buscando...';
+  status.style.display = 'none';
+  el.innerHTML = '<p class="muted">Buscando en TMDB con múltiples estrategias...</p>';
+
+  try {
+    const data = await apiFetch(`/rematch/${currentEditMovie.id}/auto-search`, { method: 'POST' });
+    if (!data.results?.length) {
+      status.textContent = '⚠ No se encontraron resultados automáticos. Usa la búsqueda manual.';
+      status.style.display = 'block';
+      el.innerHTML = '';
+    } else {
+      status.textContent = `Buscado como: "${data.searched_as}" — seleccioná el correcto:`;
+      status.style.display = 'block';
+      renderMatchResults(el, data.results, data.media_type);
+    }
+  } catch (err) {
+    el.innerHTML = `<p class="muted">Error: ${escHtml(err.message)}</p>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Auto-identificar';
+  }
+}
+
+// Manual search from the search box
 document.getElementById('editMatchSearch').addEventListener('click', searchEditMatches);
-document.getElementById('editMatchQuery').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); searchEditMatches(); } });
+document.getElementById('editMatchQuery').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); searchEditMatches(); }
+});
 
 async function searchEditMatches() {
   if (!currentEditMovie) return;
-  const q    = document.getElementById('editMatchQuery').value.trim();
-  const type = document.getElementById('editMatchType').value;
+  const q        = document.getElementById('editMatchQuery').value.trim();
+  const type     = document.getElementById('editMatchType').value;
   const tmdbType = type === 'documentary' ? 'movie' : type;
-  const el   = document.getElementById('editMatchResults');
+  const el       = document.getElementById('editMatchResults');
   if (!q) return;
   el.innerHTML = '<p class="muted">Buscando...</p>';
   try {
     const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${tmdbType}`).then(r => r.json());
-    if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el título original.</p>'; return; }
-    el.innerHTML = data.results.slice(0, 12).map(item => {
-      const title  = item.title || item.name || '';
-      const year   = (item.release_date || item.first_air_date || '').slice(0, 4);
-      const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : `https://placehold.co/130x195/16162a/444?text=${encodeURIComponent(title || '?')}`;
-      return `<div class="tmdb-card" onclick="applyEditMatch(${item.id}, '${type}')"><img src="${poster}" alt="${escHtml(title)}" /><div class="tmdb-card-title">${escHtml(title)}</div><div class="tmdb-card-year">${year}</div></div>`;
-    }).join('');
+    if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el título original o en inglés.</p>'; return; }
+    renderMatchResults(el, data.results.slice(0, 12).map(r => ({
+      id:           r.id,
+      media_type:   tmdbType,
+      title:        r.title || r.name || '',
+      year:         parseInt((r.release_date || r.first_air_date || '').slice(0, 4)) || null,
+      poster_path:  r.poster_path || null,
+      vote_average: r.vote_average || null,
+    })), tmdbType);
   } catch { el.innerHTML = '<p class="muted">Error buscando en TMDB.</p>'; }
+}
+
+function renderMatchResults(el, results, mediaType) {
+  el.innerHTML = results.map(item => {
+    const poster = item.poster_path
+      ? `https://image.tmdb.org/t/p/w185${item.poster_path}`
+      : `https://placehold.co/130x195/16162a/444?text=${encodeURIComponent(item.title || '?')}`;
+    const score = item.vote_average ? ` · ⭐${Number(item.vote_average).toFixed(1)}` : '';
+    return `<div class="tmdb-card" onclick="applyEditMatch(${item.id}, '${escHtml(mediaType)}')">
+      <img src="${poster}" alt="${escHtml(item.title)}" />
+      <div class="tmdb-card-title">${escHtml(item.title)}</div>
+      <div class="tmdb-card-year">${item.year || ''}${score}</div>
+    </div>`;
+  }).join('');
 }
 
 async function applyEditMatch(tmdbId, type) {
@@ -477,12 +534,9 @@ async function applyEditMatch(tmdbId, type) {
   const el = document.getElementById('editMatchResults');
   el.innerHTML = '<p class="muted">Aplicando metadatos...</p>';
   try {
-    const tmdbType = type === 'documentary' ? 'movie' : type;
-    const saveType = type === 'documentary' ? 'documentary' : null;
-    const body = { tmdb_id: Number(tmdbId), type: tmdbType };
-    if (saveType) body.save_type = saveType;
+    const body = { tmdb_id: Number(tmdbId), type };
     await apiFetch(`/rematch/${currentEditMovie.id}/identify`, { method: 'POST', body: JSON.stringify(body) });
-    showToast('Metadatos actualizados');
+    showToast('✓ Metadatos aplicados correctamente');
     await openEdit(currentEditMovie.id, false);
     loadDashboard();
     loadLibrary();
