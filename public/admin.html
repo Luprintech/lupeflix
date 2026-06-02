@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LupeFlix — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="admin.css?v=20260602" />
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="logo">LUPEFLIX <span>ADMIN</span></div>
+    <h2>Acceso de Administrador</h2>
+    <input type="password" id="adminTokenInput" placeholder="Token de administrador" />
+    <div id="authError" class="error-msg" style="display:none">Token incorrecto</div>
+    <button id="authBtn">Ingresar</button>
+  </div>
+</div>
+
+<!-- MAIN ADMIN -->
+<div id="adminApp" style="display:none">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">LUPEFLIX <span>ADMIN</span></div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-section="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a href="#" class="nav-item" data-section="library">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Biblioteca
+      </a>
+      <a href="#" class="nav-item" data-section="add">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Agregar Contenido
+      </a>
+      <a href="#" class="nav-item" data-section="upload">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+        Subir Archivos
+      </a>
+      <a href="#" class="nav-item" data-section="scan">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Escanear NAS
+      </a>
+    </nav>
+    <a href="home.html" class="sidebar-back">← Volver a LupeFlix</a>
+  </aside>
+
+  <main class="admin-main">
+
+    <!-- DASHBOARD -->
+    <section id="sec-dashboard" class="admin-section active">
+      <h1 class="section-heading">Dashboard</h1>
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-num" id="statTotal">–</div><div class="stat-label">Títulos totales</div></div>
+        <div class="stat-card"><div class="stat-num" id="statMovies">–</div><div class="stat-label">Películas</div></div>
+        <div class="stat-card"><div class="stat-num" id="statSeries">–</div><div class="stat-label">Series</div></div>
+        <div class="stat-card"><div class="stat-num" id="statViews">–</div><div class="stat-label">Reproducciones</div></div>
+      </div>
+      <h2 class="sub-heading">Agregados recientemente</h2>
+      <div id="recentList" class="media-list"></div>
+    </section>
+
+    <!-- LIBRARY -->
+    <section id="sec-library" class="admin-section">
+      <div class="section-toolbar">
+        <h1 class="section-heading">Biblioteca</h1>
+        <div class="toolbar-right">
+          <input type="text" id="libSearch" placeholder="Buscar..." class="search-input" />
+          <select id="libType" class="select-input">
+            <option value="">Todos</option>
+            <option value="movie">Películas</option>
+            <option value="tv">Series</option>
+          </select>
+          <button id="rematchAllBtn" class="btn-primary" style="white-space:nowrap" title="Vuelve a descargar metadata de TMDB en español para todos los títulos">
+            🔄 Actualizar a Castellano
+          </button>
+        </div>
+      </div>
+      <div id="rematchProgress" style="display:none;margin-bottom:16px">
+        <div class="progress-info"><span id="rematchStatus"></span><span id="rematchCount"></span></div>
+        <div class="progress-bar"><div class="progress-fill" id="rematchFill"></div></div>
+        <div id="rematchLog" class="add-all-log"></div>
+      </div>
+      <div id="libraryList" class="media-list"></div>
+    </section>
+
+    <!-- ADD CONTENT -->
+    <section id="sec-add" class="admin-section">
+      <h1 class="section-heading">Agregar Contenido</h1>
+
+      <div class="card-panel">
+        <h2 class="panel-title">Buscar en TMDB</h2>
+        <div class="tmdb-search-row">
+          <input type="text" id="tmdbQuery" placeholder="Nombre de la película o serie..." class="search-input" />
+          <select id="tmdbType" class="select-input" style="width:140px">
+            <option value="movie">Película</option>
+            <option value="tv">Serie</option>
+          </select>
+          <button id="tmdbSearchBtn" class="btn-primary">Buscar</button>
+        </div>
+        <div id="tmdbResults" class="tmdb-results"></div>
+      </div>
+
+      <div class="card-panel" id="manualForm" style="display:none">
+        <h2 class="panel-title">Información del título <button id="clearForm" class="btn-ghost btn-sm">✕ Limpiar</button></h2>
+        <form id="addForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Título *</label>
+              <input type="text" name="title" required />
+            </div>
+            <div class="form-group">
+              <label>Título Original</label>
+              <input type="text" name="original_title" />
+            </div>
+            <div class="form-group">
+              <label>Año</label>
+              <input type="number" name="year" min="1900" max="2099" />
+            </div>
+            <div class="form-group">
+              <label>Tipo</label>
+              <select name="type">
+                <option value="movie">Película</option>
+                <option value="tv">Serie</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Calificación (0-10)</label>
+              <input type="number" name="rating" min="0" max="10" step="0.1" />
+            </div>
+            <div class="form-group">
+              <label>Duración (minutos)</label>
+              <input type="number" name="duration" />
+            </div>
+            <div class="form-group">
+              <label>Géneros</label>
+              <input type="text" name="genres" placeholder="Acción, Drama, ..." />
+            </div>
+            <div class="form-group">
+              <label>Director</label>
+              <input type="text" name="director" />
+            </div>
+            <div class="form-group span2">
+              <label>Reparto</label>
+              <input type="text" name="cast" placeholder="Actor 1, Actor 2, ..." />
+            </div>
+            <div class="form-group span2">
+              <label>Descripción</label>
+              <textarea name="description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Poster URL / Path TMDB</label>
+              <input type="text" name="poster_path" id="posterPathInput" />
+            </div>
+            <div class="form-group">
+              <label>Backdrop URL / Path TMDB</label>
+              <input type="text" name="backdrop_path" />
+            </div>
+            <div class="form-group">
+              <label>TMDB ID</label>
+              <input type="number" name="tmdb_id" />
+            </div>
+            <div class="form-group">
+              <label>Ruta del archivo en NAS *</label>
+              <input type="text" name="file_path" id="filePathInput" placeholder="movies/Titulo/archivo.mp4" required />
+            </div>
+          </div>
+
+          <div id="posterPreview" class="poster-preview" style="display:none">
+            <img id="posterImg" src="" alt="poster" />
+          </div>
+
+          <div id="addError" class="error-msg" style="display:none"></div>
+          <div id="addSuccess" class="success-msg" style="display:none"></div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">💾 Guardar en Biblioteca</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- UPLOAD -->
+    <section id="sec-upload" class="admin-section">
+      <h1 class="section-heading">Subir Archivos al NAS</h1>
+      <div class="card-panel">
+        <h2 class="panel-title">Cargar video</h2>
+        <div class="form-group">
+          <label>Subcarpeta destino en /media</label>
+          <input type="text" id="uploadFolder" value="uploads" class="search-input" placeholder="movies/Titulo" />
+        </div>
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon">📁</div>
+          <p>Arrastrá tu archivo de video aquí</p>
+          <p class="drop-sub">o hacé click para seleccionar</p>
+          <input type="file" id="fileInput" accept="video/*" style="display:none" />
+        </div>
+        <div id="uploadProgress" style="display:none">
+          <div class="progress-info">
+            <span id="uploadFileName"></span>
+            <span id="uploadPercent">0%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          <p id="uploadSpeed" class="muted"></p>
+        </div>
+        <div id="uploadResult" class="success-msg" style="display:none"></div>
+        <div id="uploadError" class="error-msg" style="display:none"></div>
+      </div>
+    </section>
+
+    <!-- SCAN -->
+    <section id="sec-scan" class="admin-section">
+      <h1 class="section-heading">Escanear NAS</h1>
+      <div class="card-panel">
+        <h2 class="panel-title">Detectar archivos de video</h2>
+        <p class="muted">Escanea la carpeta <strong>/media</strong> del contenedor Docker y lista todos los archivos de video encontrados.</p>
+        <div class="form-group" style="margin-top:16px">
+          <label>Filtrar por directorio (opcional — dejá vacío para escanear todo)</label>
+          <select id="scanFolder" class="select-input" style="width:100%">
+            <option value="">Todos los directorios</option>
+            <option value="/media/Películas">🎬 Películas (vol1)</option>
+            <option value="/media/Películas2">🎬 Películas 2 (vol2)</option>
+            <option value="/media/PeliculasAnimacion">🎬 Películas Animación (vol2)</option>
+            <option value="/media/Series">📺 Series (vol2)</option>
+            <option value="/media/SeriesAnimacion">📺 Series Animación (vol2)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+          <button id="scanBtn" class="btn-primary">🔍 Escanear</button>
+          <button id="addAllBtn" class="btn-primary" style="display:none;background:#1a472a;border:1px solid #27ae60">⚡ Agregar todos automáticamente</button>
+          <button id="addAllStopBtn" class="btn-danger" style="display:none">⏹ Detener</button>
+        </div>
+        <div id="addAllProgress" style="display:none;margin-top:16px">
+          <div class="progress-info">
+            <span id="addAllStatus"></span>
+            <span id="addAllCount"></span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="addAllFill"></div></div>
+          <div id="addAllLog" class="add-all-log"></div>
+        </div>
+        <div id="scanResults" style="margin-top:24px"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editOverlay" style="display:none">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <h2>Editar Título</h2>
+      <button id="editClose">✕</button>
+    </div>
+    <form id="editForm">
+      <input type="hidden" name="id" />
+      <div class="form-grid">
+        <div class="form-group"><label>Título</label><input type="text" name="title" required /></div>
+        <div class="form-group"><label>Año</label><input type="number" name="year" /></div>
+        <div class="form-group"><label>Tipo</label>
+          <select name="type"><option value="movie">Película</option><option value="tv">Serie</option></select>
+        </div>
+        <div class="form-group"><label>Rating</label><input type="number" name="rating" step="0.1" /></div>
+        <div class="form-group"><label>Duración (min)</label><input type="number" name="duration" /></div>
+        <div class="form-group"><label>Géneros</label><input type="text" name="genres" /></div>
+        <div class="form-group"><label>Director</label><input type="text" name="director" /></div>
+        <div class="form-group span2"><label>Reparto</label><input type="text" name="cast" /></div>
+        <div class="form-group span2"><label>Descripción</label><textarea name="description" rows="3"></textarea></div>
+        <div class="form-group"><label>Poster Path</label><input type="text" name="poster_path" /></div>
+        <div class="form-group"><label>Backdrop Path</label><input type="text" name="backdrop_path" /></div>
+        <div class="form-group span2"><label>Ruta del archivo</label><input type="text" name="file_path" /></div>
+      </div>
+      <div id="editError" class="error-msg" style="display:none"></div>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">💾 Guardar cambios</button>
+        <button type="button" id="deleteBtn" class="btn-danger">🗑 Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="admin.js?v=20260602"></script>
+</body>
+</html>

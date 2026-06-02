@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LupeFlix — Mi Perfil</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#e50914" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="profile.css?v=20260602" />
+</head>
+<body>
+  <nav class="topbar">
+    <a href="home.html" class="topbar-logo">LUPEFLIX</a>
+    <div class="topbar-right">
+      <div class="user-avatar" id="userAvatar">U</div>
+      <a href="home.html" class="topbar-back">← Volver</a>
+    </div>
+  </nav>
+
+  <main class="profile-main">
+
+    <!-- SIDEBAR TABS -->
+    <aside class="profile-sidebar">
+      <div class="profile-avatar-big" id="avatarBig">U</div>
+      <div class="profile-name" id="profileName">Usuario</div>
+      <div class="profile-email" id="profileEmail"></div>
+      <nav class="profile-nav">
+        <a href="#" class="tab-link active" data-tab="settings">⚙ Configuración</a>
+        <a href="#" class="tab-link" data-tab="favorites">❤ Favoritos</a>
+        <a href="#" class="tab-link" data-tab="watchlist">🕐 Ver después</a>
+        <a href="#" class="tab-link" data-tab="history">▶ Historial</a>
+      </nav>
+    </aside>
+
+    <!-- CONTENT -->
+    <div class="profile-content">
+
+      <!-- SETTINGS -->
+      <section class="tab-panel active" id="tab-settings">
+        <h1 class="panel-title">Configuración de perfil</h1>
+        <form id="settingsForm" class="settings-form">
+          <div class="form-group">
+            <label>Nombre visible</label>
+            <input type="text" name="display_name" id="settingName" />
+          </div>
+          <div class="form-group">
+            <label>Color de avatar</label>
+            <div class="color-options" id="colorOptions">
+              <div class="color-swatch active" data-color="#e50914" style="background:#e50914"></div>
+              <div class="color-swatch" data-color="#2980b9" style="background:#2980b9"></div>
+              <div class="color-swatch" data-color="#27ae60" style="background:#27ae60"></div>
+              <div class="color-swatch" data-color="#8e44ad" style="background:#8e44ad"></div>
+              <div class="color-swatch" data-color="#f39c12" style="background:#f39c12"></div>
+              <div class="color-swatch" data-color="#e74c3c" style="background:#e74c3c"></div>
+            </div>
+            <input type="hidden" name="avatar_color" id="avatarColorInput" value="#e50914" />
+          </div>
+          <div class="form-group">
+            <label>Reproducción automática</label>
+            <label class="toggle">
+              <input type="checkbox" name="autoplay" id="autoplayToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div id="settingsMsg" style="display:none"></div>
+          <button type="submit" class="btn-save">💾 Guardar cambios</button>
+        </form>
+      </section>
+
+      <!-- FAVORITES -->
+      <section class="tab-panel" id="tab-favorites">
+        <h1 class="panel-title">❤ Mis Favoritos</h1>
+        <div class="media-grid" id="favGrid"></div>
+      </section>
+
+      <!-- WATCHLIST -->
+      <section class="tab-panel" id="tab-watchlist">
+        <h1 class="panel-title">🕐 Ver Después</h1>
+        <div class="media-grid" id="watchlistGrid"></div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="tab-panel" id="tab-history">
+        <h1 class="panel-title">▶ Historial de reproducción</h1>
+        <button id="clearHistoryBtn" class="btn-clear">🗑 Limpiar historial</button>
+        <div class="history-list" id="historyList"></div>
+      </section>
+
+    </div>
+  </main>
+
+  <script src="profile.js?v=20260602"></script>
+</body>
+</html>

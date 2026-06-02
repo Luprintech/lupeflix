@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  lupeflix:
+    build: .
+    container_name: lupeflix
+    restart: unless-stopped
+    ports:
+      - "3030:3000"
+    volumes:
+      # ── Volumen 1 ──
+      - /volume1/Películas:/media/Películas:ro
+      # ── Volumen 2 ──
+      - /volume2/Películas 2:/media/Películas2:ro
+      - /volume2/Peliculas Animación:/media/PeliculasAnimacion:ro
+      - /volume2/Series:/media/Series:ro
+      - /volume2/Series animación:/media/SeriesAnimacion:ro
+      - /volume2/Documentales:/media/Documentales:ro
+      # ── Base de datos persistente ──
+      - lupeflix_data:/data
+    env_file:
+      - .env
+
+volumes:
+  lupeflix_data:

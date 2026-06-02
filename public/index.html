@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LupeFlix — Iniciar Sesión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="login.css?v=20260602" />
+</head>
+<body>
+  <div class="login-bg">
+    <div class="login-overlay"></div>
+    <div class="login-container">
+      <div class="login-logo"><span class="logo-text">LUPEFLIX</span></div>
+
+      <!-- LOGIN CARD -->
+      <div class="login-card" id="loginCard">
+        <h1>Iniciar Sesión</h1>
+
+        <!-- Google button (shown only if configured) -->
+        <div id="googleBtnWrapper" style="display:none;margin-bottom:20px">
+          <div id="googleBtn"></div>
+          <div class="divider"><span>o continúa con tu correo</span></div>
+        </div>
+
+        <form id="loginForm">
+          <div class="form-group">
+            <input type="email" id="email" placeholder="Correo electrónico" required autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <input type="password" id="password" placeholder="Contraseña" required autocomplete="current-password" />
+          </div>
+          <div id="loginError" class="login-error" style="display:none">Correo o contraseña incorrectos.</div>
+          <button type="submit" class="btn-login">Iniciar Sesión</button>
+        </form>
+        <p class="login-footer">¿Primera vez? <a href="#" id="showRegister">Crear cuenta</a></p>
+      </div>
+
+      <!-- REGISTER CARD -->
+      <div class="login-card" id="registerCard" style="display:none">
+        <h1>Crear Cuenta</h1>
+        <form id="registerForm">
+          <div class="form-group">
+            <input type="text" id="regName" placeholder="Nombre completo" required />
+          </div>
+          <div class="form-group">
+            <input type="email" id="regEmail" placeholder="Correo electrónico" required />
+          </div>
+          <div class="form-group">
+            <input type="password" id="regPassword" placeholder="Contraseña (mín. 6 caracteres)" required minlength="6" />
+          </div>
+          <div id="registerError" class="login-error" style="display:none"></div>
+          <div id="registerSuccess" class="login-success" style="display:none">¡Cuenta creada! Iniciá sesión.</div>
+          <button type="submit" class="btn-login">Crear Cuenta</button>
+        </form>
+        <p class="login-footer">¿Ya tenés cuenta? <a href="#" id="showLogin">Iniciá sesión</a></p>
+      </div>
+
+    </div>
+  </div>
+  <script src="login.js?v=20260602"></script>
+</body>
+</html>

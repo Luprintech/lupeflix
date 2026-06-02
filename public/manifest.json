@@ -1,0 +1,20 @@
+{
+  "name": "LupeFlix",
+  "short_name": "LupeFlix",
+  "description": "Tu biblioteca personal de películas y series",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#e50914",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["entertainment"],
+  "screenshots": [],
+  "shortcuts": [
+    { "name": "Películas", "url": "/home.html?filter=movie", "description": "Ver películas" },
+    { "name": "Series",    "url": "/home.html?filter=tv",    "description": "Ver series" }
+  ]
+}
