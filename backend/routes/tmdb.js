@@ -14,11 +14,77 @@ async function tmdbGet(endpoint, params = {}, lang = 'es-ES') {
   return r.json();
 }
 
-// GET /api/tmdb/search?q=...&type=movie|tv&year=...
+function uniqByMediaAndId(items) {
+  const seen = new Set();
+  return items.filter(item => {
+    const mediaType = item.media_type || (item.name ? 'tv' : 'movie');
+    if (!['movie', 'tv'].includes(mediaType)) return false;
+    const key = `${mediaType}:${item.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    item.media_type = mediaType;
+    return true;
+  });
+}
+
+function documentaryQueryVariants(q) {
+  const clean = String(q || '').trim();
+  const lower = clean.toLowerCase();
+  const variants = new Set([clean]);
+
+  // Common Spanish file titles for nature docs often have no official Spanish
+  // alias in TMDB search, but the original English title exists.
+  if (/salvar\s+(al|el)\s+planeta\s+tierra/.test(lower)) variants.add('Saving Planet Earth');
+  if (/nuestro\s+planeta/.test(lower)) variants.add('Our Planet');
+  if (/vida\s+en\s+nuestro\s+planeta/.test(lower)) variants.add('Life on Our Planet');
+  if (/limites?\s+de\s+nuestro\s+planeta/.test(lower)) variants.add('Breaking Boundaries: The Science of Our Planet');
+
+  return [...variants].filter(Boolean);
+}
+
+function rankDocumentaries(items) {
+  return uniqByMediaAndId(items)
+    .map(item => {
+      const genres = item.genre_ids || [];
+      const isDoc = genres.includes(99);
+      const isFamily = genres.includes(10751);
+      const isNews = genres.includes(10763);
+      const isFiction = genres.some(g => [28, 35, 80, 878, 14, 27].includes(g));
+      return {
+        ...item,
+        _score: (isDoc ? 100 : 0) + (isFamily ? 6 : 0) + (isNews ? 3 : 0) - (isFiction ? 40 : 0) + Number(item.vote_count || 0) / 1000,
+      };
+    })
+    .sort((a, b) => b._score - a._score)
+    .filter(item => item._score > 0);
+}
+
+async function searchDocumentary(q, year) {
+  const collected = [];
+  for (const query of documentaryQueryVariants(q)) {
+    for (const lang of ['es-ES', 'en-US']) {
+      const params = { query };
+      if (year) {
+        params.year = year;
+        params.first_air_date_year = year;
+      }
+      const data = await tmdbGet('/search/multi', params, lang);
+      collected.push(...(data.results || []));
+    }
+  }
+  const results = rankDocumentaries(collected).slice(0, 20);
+  return { page: 1, results, total_pages: results.length ? 1 : 0, total_results: results.length };
+}
+
+// GET /api/tmdb/search?q=...&type=movie|tv|documentary&year=...
 router.get('/search', async (req, res) => {
   const { q, type = 'movie', year } = req.query;
   if (!q) return res.status(400).json({ error: 'q required' });
   try {
+    if (type === 'documentary') {
+      return res.json(await searchDocumentary(q, year));
+    }
+
     const endpoint = type === 'tv' ? '/search/tv' : '/search/movie';
     const params   = { query: q };
     if (year) params.year = year;

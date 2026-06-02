@@ -159,7 +159,7 @@ router.get('/:id/extras', async (req, res) => {
   if (!movie) return res.status(404).json({ error: 'Not found' });
   if (!movie.tmdb_id) return res.json({ trailer: null, cast: [], similar: [], providers: providerSummary(null) });
 
-  const type = movie.type === 'tv' ? 'tv' : 'movie';
+  const type = movie.tmdb_media_type || (movie.type === 'tv' ? 'tv' : 'movie');
 
   try {
     const [videosEs, credits, similar, providers] = await Promise.all([

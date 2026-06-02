@@ -25,6 +25,7 @@ db.exec(`
     poster_path   TEXT,
     backdrop_path TEXT,
     tmdb_id       INTEGER,
+    tmdb_media_type TEXT,
     file_path     TEXT,
     file_size     INTEGER,
     added_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -89,6 +90,7 @@ const migrations = [
   { col: 'series_id',        sql: 'ALTER TABLE movies ADD COLUMN series_id INTEGER' },
   { col: 'series_title',     sql: 'ALTER TABLE movies ADD COLUMN series_title TEXT' },
   { col: 'series_poster',    sql: 'ALTER TABLE movies ADD COLUMN series_poster TEXT' },
+  { col: 'tmdb_media_type',  sql: 'ALTER TABLE movies ADD COLUMN tmdb_media_type TEXT' },
 ];
 migrations.forEach(m => { if (!existingCols.includes(m.col)) db.exec(m.sql); });
 

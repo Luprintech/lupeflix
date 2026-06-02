@@ -1,4 +1,4 @@
-const CACHE = 'lupeflix-v10-20260602';
+const CACHE = 'lupeflix-v11-20260602';
 const STATIC = [
   '/', '/index.html', '/home.html', '/admin.html', '/profile.html',
   '/home.css', '/login.css', '/admin.css', '/profile.css',

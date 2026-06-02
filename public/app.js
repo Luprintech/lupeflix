@@ -792,7 +792,8 @@ async function showSeriesModal(key) {
 
 let metadataTarget = null;
 async function openMetadataMatch(id, title, type = 'movie') {
-  metadataTarget = { id, title, type: type === 'tv' ? 'tv' : 'movie' };
+  const targetType = type === 'tv' ? 'tv' : (type === 'documentary' ? 'documentary' : 'movie');
+  metadataTarget = { id, title, type: targetType };
   openOverlay('metadataOverlay');
   const q = document.getElementById('metadataQuery');
   const t = document.getElementById('metadataType');
@@ -811,17 +812,30 @@ async function searchMetadataMatches() {
   results.innerHTML = '<p class="metadata-help">Buscando...</p>';
   try {
     const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json());
-    if (!data.results?.length) { results.innerHTML = '<p class="metadata-help">Sin resultados. Prueba con el título original.</p>'; return; }
+    if (!data.results?.length) {
+      results.innerHTML = '<p class="metadata-help">Sin resultados. Prueba con el t?tulo original.</p>';
+      return;
+    }
     results.innerHTML = data.results.slice(0, 12).map(item => {
       const title = item.title || item.name || '';
       const year = (item.release_date || item.first_air_date || '').slice(0, 4);
       const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : `https://placehold.co/90x135/222/555?text=${encodeURIComponent(title || '?')}`;
-      return `<button class="metadata-card" data-tmdb="${item.id}" data-type="${type}"><img src="${poster}" /><span><strong>${escHtml(title)}</strong><small>${year || 'Sin año'} ? ${Number(item.vote_average || 0).toFixed(1)}/10</small></span></button>`;
+      const lookupType = item.media_type === 'tv' ? 'tv' : (type === 'tv' ? 'tv' : 'movie');
+      const saveType = type === 'documentary' ? 'documentary' : lookupType;
+      const badge = type === 'documentary'
+        ? (lookupType === 'tv' ? 'Documental TV' : 'Documental')
+        : (lookupType === 'tv' ? 'Serie' : 'Pel?cula');
+      return `<button class="metadata-card" data-tmdb="${item.id}" data-type="${lookupType}" data-save-type="${saveType}"><img src="${poster}" /><span><strong>${escHtml(title)}</strong><small>${escHtml(badge)} ? ${year || 'Sin a?o'} ? ${Number(item.vote_average || 0).toFixed(1)}/10</small></span></button>`;
     }).join('');
-    results.querySelectorAll('.metadata-card').forEach(btn => btn.addEventListener('click', () => applyMetadataMatch(btn.dataset.tmdb, btn.dataset.type)));
-  } catch (e) { console.error(e); results.innerHTML = '<p class="metadata-help">Error buscando en TMDB.</p>'; }
+    results.querySelectorAll('.metadata-card').forEach(btn => {
+      btn.addEventListener('click', () => applyMetadataMatch(btn.dataset.tmdb, btn.dataset.type, btn.dataset.saveType));
+    });
+  } catch (e) {
+    console.error(e);
+    results.innerHTML = '<p class="metadata-help">Error buscando en TMDB.</p>';
+  }
 }
-async function applyMetadataMatch(tmdbId, type) {
+async function applyMetadataMatch(tmdbId, type, saveType = null) {
   if (!metadataTarget) return;
   const results = document.getElementById('metadataResults');
   if (results) results.innerHTML = '<p class="metadata-help">Aplicando metadatos...</p>';
@@ -829,7 +843,7 @@ async function applyMetadataMatch(tmdbId, type) {
     await fetch(`/api/rematch/${metadataTarget.id}/identify`, {
       method: 'POST',
       headers: auth(),
-      body: JSON.stringify({ tmdb_id: Number(tmdbId), type }),
+      body: JSON.stringify({ tmdb_id: Number(tmdbId), type, save_type: saveType }),
     }).then(async r => { if (!r.ok) throw new Error((await r.json()).error || 'Error identificando'); return r.json(); });
     closeOverlay('metadataOverlay');
     showToast('Metadatos actualizados');

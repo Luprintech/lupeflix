@@ -33,25 +33,26 @@ async function tmdb(endpoint, lang = 'es-ES', extraParams = {}) {
   return r.json();
 }
 
-async function applyMetadata(movie, tmdbId, mediaType) {
-  const type = mediaType === 'tv' ? 'tv' : 'movie';
-  const detail = await tmdb(`/${type}/${tmdbId}`, 'es-ES');
+async function applyMetadata(movie, tmdbId, mediaType, saveType = null) {
+  const lookupType = mediaType === 'tv' ? 'tv' : 'movie';
+  const libraryType = saveType === 'documentary' ? 'documentary' : lookupType;
+  const detail = await tmdb(`/${lookupType}/${tmdbId}`, 'es-ES');
 
   if (!detail.overview) {
-    const en = await tmdb(`/${type}/${tmdbId}`, 'en-US').catch(() => ({}));
+    const en = await tmdb(`/${lookupType}/${tmdbId}`, 'en-US').catch(() => ({}));
     detail.overview = en.overview || '';
   }
 
   let posterPath = detail.poster_path;
   try {
-    const images = await tmdb(`/${type}/${tmdbId}/images`, '', { include_image_language: 'es,null' });
+    const images = await tmdb(`/${lookupType}/${tmdbId}/images`, '', { include_image_language: 'es,null' });
     const esPoster = (images.posters || []).find(p => p.iso_639_1 === 'es');
     if (esPoster) posterPath = esPoster.file_path;
   } catch {}
 
   let director = '', cast = '';
   try {
-    const credits = await tmdb(`/${type}/${tmdbId}/credits`, 'es-ES');
+    const credits = await tmdb(`/${lookupType}/${tmdbId}/credits`, 'es-ES');
     director = (credits.crew || []).filter(c => c.job === 'Director').slice(0, 2).map(c => c.name).join(', ');
     cast     = (credits.cast || []).slice(0, 8).map(c => c.name).join(', ');
   } catch {}
@@ -63,7 +64,7 @@ async function applyMetadata(movie, tmdbId, mediaType) {
   db.prepare(`
     UPDATE movies SET
       title=?, original_title=?, year=?, description=?, genres=?, director=?, cast=?,
-      rating=?, duration=?, poster_path=?, backdrop_path=?, tmdb_id=?, type=?
+      rating=?, duration=?, poster_path=?, backdrop_path=?, tmdb_id=?, tmdb_media_type=?, type=?
     WHERE id=?
   `).run(
     title,
@@ -78,11 +79,12 @@ async function applyMetadata(movie, tmdbId, mediaType) {
     posterPath || movie.poster_path,
     detail.backdrop_path || movie.backdrop_path,
     Number(tmdbId),
-    type,
+    lookupType,
+    libraryType,
     movie.id
   );
 
-  return { title, year, poster: posterPath, type, tmdb_id: Number(tmdbId) };
+  return { title, year, poster: posterPath, type: libraryType, tmdb_media_type: lookupType, tmdb_id: Number(tmdbId) };
 }
 
 // POST /api/rematch/:id/identify ? set TMDB ID manually and refresh metadata.
@@ -90,11 +92,11 @@ router.post('/:id/identify', requireAdmin, async (req, res) => {
   const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
   if (!movie) return res.status(404).json({ error: 'Not found' });
 
-  const { tmdb_id, type } = req.body || {};
+  const { tmdb_id, type, save_type } = req.body || {};
   if (!tmdb_id) return res.status(400).json({ error: 'tmdb_id required' });
 
   try {
-    const result = await applyMetadata(movie, tmdb_id, type || movie.type || 'movie');
+    const result = await applyMetadata(movie, tmdb_id, type || movie.tmdb_media_type || movie.type || 'movie', save_type);
     res.json({ ok: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -107,7 +109,7 @@ router.post('/:id', requireAdmin, async (req, res) => {
   if (!movie) return res.status(404).json({ error: 'Not found' });
   if (!movie.tmdb_id) return res.status(400).json({ error: 'No TMDB ID ? use identify metadata' });
 
-  const type = movie.type === 'tv' ? 'tv' : 'movie';
+  const type = movie.tmdb_media_type || (movie.type === 'tv' ? 'tv' : 'movie');
   try {
     const result = await applyMetadata(movie, movie.tmdb_id, type);
     res.json({ ok: true, ...result });

@@ -254,9 +254,9 @@ router.post('/', requireAdmin, async (req, res) => {
       const result = db.prepare(`
         INSERT INTO movies
           (title, original_title, year, description, genres, rating, duration, type,
-           poster_path, backdrop_path, tmdb_id, file_path, file_size,
+           poster_path, backdrop_path, tmdb_id, tmdb_media_type, file_path, file_size,
            season_number, episode_number, episode_title, series_id, series_title, series_poster)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `).run(
         displayTitle,
         seriesItem?.original_name || seriesRaw,
@@ -269,6 +269,7 @@ router.post('/', requireAdmin, async (req, res) => {
         epDetails?.still_path || posterPath,
         seriesItem?.backdrop_path || '',
         seriesItem?.id || null,
+        'tv',
         file_path, file_size || null,
         epInfo?.season || null, epInfo?.episode || null, epTitle,
         seriesItem?.id || null, seriesTitle, posterPath
@@ -347,12 +348,12 @@ router.post('/', requireAdmin, async (req, res) => {
     const result = db.prepare(`
       INSERT INTO movies
         (title, original_title, year, description, genres, director, cast, rating, duration, type,
-         poster_path, backdrop_path, tmdb_id, file_path, file_size)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         poster_path, backdrop_path, tmdb_id, tmdb_media_type, file_path, file_size)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       title, tmdbItem?.original_title || omdbData?.title || parsedTitle || '',
       year, desc, genres, dir, cast, rating, dur, type,
-      poster, back, tmdbItem?.id || null, file_path, file_size || null
+      poster, back, tmdbItem?.id || null, tmdbItem ? tmdbType : null, file_path, file_size || null
     );
 
     res.json({ ok: true, id: result.lastInsertRowid, title, year, source, tmdb_found: source !== 'none' });
