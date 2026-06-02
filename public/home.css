@@ -501,3 +501,15 @@ a { text-decoration: none; color: inherit; }
 .metadata-card strong { display: block; font-size: .85rem; line-height: 1.25; margin-bottom: 5px; }
 .metadata-card small { color: var(--muted); }
 @media (max-width: 640px) { .metadata-search-row { grid-template-columns: 1fr; } }
+
+
+/* lupeflix-modal-interaction-fix */
+.detail-backdrop, .series-backdrop { pointer-events: none; }
+.detail-backdrop-vignette, .series-backdrop-vignette { pointer-events: none; }
+.detail-content, .detail-extra, .series-info, .episodes-panel { position: relative; z-index: 3; }
+.detail-actions, .series-btns { position: relative; z-index: 5; pointer-events: auto; }
+.detail-actions button, .series-btns button, .btn-primary-detail, .btn-trailer, .icon-btn { pointer-events: auto; opacity: 1; }
+.detail-modal, .series-modal { pointer-events: auto; }
+.btn-primary-detail, .btn-trailer { cursor: pointer; }
+.series-btns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#seriesPlayFirst { min-width: 132px; justify-content: center; }

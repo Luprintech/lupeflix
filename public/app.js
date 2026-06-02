@@ -126,7 +126,7 @@ function renderHero(i) {
 
   if (m.is_series) {
     playBtn.style.display = 'none';
-    infoBtn.onclick = () => showSeriesModal(m.series_id || m.title);
+    infoBtn.onclick = () => showSeriesModal(m.series_key || m.series_id || m.series_title || m.title);
   } else {
     playBtn.style.display = 'flex';
     playBtn.onclick = () => m.file_path ? play(m.id, m.title) : showToast('Sin archivo de video');
@@ -279,7 +279,7 @@ function buildCard(m, isSeries = false, topRated = false) {
   const badgeCls = isSer ? 'card-badge-blue' : 'card-badge-red';
   // Always use data-series for series so clicks route correctly
   const key    = isSer
-    ? `data-series="${escAttr(m.series_id || m.series_title || m.title)}"`
+    ? `data-series="${escAttr(m.series_key || m.series_id || m.series_title || m.title)}"`
     : `data-id="${m.id}"`;
   const info   = isSer && m.episode_count ? `${m.episode_count} episodios` : (m.year || '');
   const ratingBadge = topRated && m.rating
@@ -595,6 +595,11 @@ async function showSeriesModal(key) {
     // Fav/later for series (using first episode id as proxy)
     const firstEp = Object.values(data.seasons)[0]?.[0];
     if (firstEp) {
+      const playBtn = document.getElementById('seriesPlayFirst');
+      if (playBtn) {
+        playBtn.style.display = firstEp.file_path ? 'flex' : 'none';
+        playBtn.onclick = () => { closeOverlay('seriesOverlay'); play(firstEp.id, firstEp.episode_title || firstEp.title || data.series_title); };
+      }
       const favBtn   = document.getElementById('seriesFav');
       const laterBtn = document.getElementById('seriesLater');
       getFavState(firstEp.id).then(s => {
