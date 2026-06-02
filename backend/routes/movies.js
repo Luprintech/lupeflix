@@ -112,14 +112,37 @@ router.get('/recent', (req, res) => {
   res.json(all);
 });
 
-// TOP RATED ? movies only (no episodes)
+// TOP RATED — supports ?type=movie|documentary|tv and ?limit=N
 router.get('/top', (req, res) => {
-  const rows = db.prepare(`
-    SELECT * FROM movies
-    WHERE type IN ('movie','documentary') AND rating IS NOT NULL AND rating > 0
-    ORDER BY rating DESC LIMIT 15
-  `).all();
-  res.json(rows);
+  const { type, limit = 15 } = req.query;
+  const n = Number(limit);
+
+  if (type === 'tv') {
+    // Group episodes into series, sort by max rating
+    const rows = db.prepare(`
+      SELECT series_id,
+        COALESCE(NULLIF(series_title,''), title)           AS title,
+        COALESCE(NULLIF(series_title,''), title)           AS series_title,
+        COALESCE(NULLIF(series_poster,''), poster_path)    AS poster_path,
+        COALESCE(NULLIF(series_poster,''), poster_path)    AS series_poster,
+        backdrop_path, MIN(year) AS year, MAX(rating) AS rating,
+        genres, description, 'tv' AS type,
+        COUNT(*) AS episode_count, 1 AS is_series
+      FROM movies
+      WHERE type = 'tv' AND rating IS NOT NULL AND rating > 0
+      GROUP BY COALESCE(CAST(series_id AS TEXT), NULLIF(series_title,''), title)
+      ORDER BY MAX(rating) DESC LIMIT ?
+    `).all(n);
+    return res.json(rows);
+  }
+
+  let query = 'SELECT * FROM movies WHERE rating IS NOT NULL AND rating > 0';
+  const params = [];
+  if (type) { query += ' AND type = ?'; params.push(type); }
+  else       { query += " AND type IN ('movie','documentary')"; }
+  query += ' ORDER BY rating DESC LIMIT ?';
+  params.push(n);
+  res.json(db.prepare(query).all(...params));
 });
 
 // NEXT EPISODE

@@ -192,79 +192,10 @@ async function buildGenreBar(type = null) {
 }
 
 /* ── SECTIONS ── */
-const HOME_SECTIONS = [
-  { title: 'Continuar viendo',    type: 'continue' },
-  { title: 'Recién añadidas',     endpoint: '/movies/recent',  params: {} },
-  { title: 'Las mejor valoradas', endpoint: '/movies/top',     params: {}, topRated: true },
-  { title: 'Películas',           endpoint: '/movies',         params: { type: 'movie', limit: 24 } },
-  { title: 'Series',              endpoint: '/series',         params: { limit: 24 }, isSeries: true },
-  { title: 'Documentales',        endpoint: '/movies',         params: { type: 'documentary', limit: 24 } },
-];
-
-async function renderHome() {
-  setNavActive('home');
-  document.getElementById('genreBar').style.display = 'none';
-  const wrap = document.getElementById('sections');
-  wrap.innerHTML = '';
-
-  for (const s of HOME_SECTIONS) {
-    if (s.type === 'continue') { await renderContinue(wrap); continue; }
-    const el = mkSkeleton(s.title);
-    wrap.appendChild(el);
-  }
-
-  const nonCont = HOME_SECTIONS.filter(s => s.type !== 'continue');
-  const slots   = wrap.querySelectorAll('.section:not(.continue-section)');
-
-  for (let i = 0; i < nonCont.length; i++) {
-    const s  = nonCont[i];
-    const el = slots[i];
-    if (!el) continue;
-    try {
-      const data  = await get(s.endpoint, s.params);
-      const items = Array.isArray(data) ? data : (data.results || []);
-      if (!items.length) { el.style.display = 'none'; continue; }
-      el.innerHTML = buildSectionHTML(s.title, items, s.isSeries, s.topRated);
-      wireSection(el);
-    } catch {}
-  }
-}
-
-async function renderContinue(wrap) {
-  try {
-    const hist = await fetch('/api/user/history', { headers: auth() }).then(r => r.json());
-    const inProg = hist.filter(m => m.progress > 30 && !m.completed);
-    if (!inProg.length) return;
-    const el = document.createElement('div');
-    el.className = 'section continue-section';
-    el.innerHTML = `
-      <div class="section-header"><div class="section-title">Continuar viendo</div></div>
-      <div class="carousel"><div class="carousel-track">
-        ${inProg.map(m => {
-          const pct = m.h_duration > 0 ? Math.round(m.progress / m.h_duration * 100) : 0;
-          const rem = m.h_duration  > 0 ? Math.round((m.h_duration - m.progress) / 60) : 0;
-          return `<div class="continue-card" data-id="${m.id}">
-            <button class="continue-remove" data-id="${m.id}" title="Quitar de continuar viendo">?</button>
-            <img class="continue-thumb" src="${poster(m)}" />
-            <div class="continue-bar"><div class="continue-fill" style="width:${pct}%"></div></div>
-            <div class="continue-meta"><div class="continue-title">${escHtml(m.title)}</div><div class="continue-time">${rem > 0 ? `${rem} min restantes` : 'Casi terminada'}</div></div>
-          </div>`;
-        }).join('')}
-      </div></div>`;
-    wrap.appendChild(el);
-    el.querySelectorAll('.continue-card').forEach(c => c.addEventListener('click', () => play(+c.dataset.id, c.querySelector('.continue-title')?.textContent || '')));
-    el.querySelectorAll('.continue-remove').forEach(btn => btn.addEventListener('click', async e => {
-      e.stopPropagation();
-      await fetch(`/api/user/history/${btn.dataset.id}`, { method: 'DELETE', headers: auth() }).catch(() => {});
-      btn.closest('.continue-card')?.remove();
-      showToast('Quitado de continuar viendo');
-    }));
-  } catch {}
-}
 
 function mkSkeleton(title) {
   const el = document.createElement('div'); el.className = 'section';
-  el.innerHTML = `<div class="section-header"><div class="section-title">${title}</div></div>
+  el.innerHTML = `<div class="section-header"><div class="section-title">${escHtml(title)}</div></div>
     <div class="carousel"><div class="carousel-track">${Array(10).fill('<div class="card-skeleton skeleton"></div>').join('')}</div></div>`;
   return el;
 }
@@ -272,7 +203,7 @@ function mkSkeleton(title) {
 function buildSectionHTML(title, items, isSeries = false, topRated = false) {
   const cards = items.map(m => buildCard(m, isSeries, topRated)).join('');
   return `
-    <div class="section-header"><div class="section-title">${title}</div></div>
+    <div class="section-header"><div class="section-title">${escHtml(title)}</div></div>
     <div class="carousel">
       <button class="carousel-arrow left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15,18 9,12 15,6"/></svg></button>
       <div class="carousel-track">${cards}</div>
@@ -281,23 +212,20 @@ function buildSectionHTML(title, items, isSeries = false, topRated = false) {
 }
 
 function buildCard(m, isSeries = false, topRated = false) {
-  // A card is a "series" if explicitly flagged OR if the DB row has is_series=1 (grouped query)
-  const isSer  = isSeries || !!m.is_series;
-  const title  = isSer ? (m.series_title || m.title) : m.title;
-  const p      = isSer
+  const isSer   = isSeries || !!m.is_series;
+  const title   = isSer ? (m.series_title || m.title) : m.title;
+  const p       = isSer
     ? (img(m.series_poster || m.poster_path) || `https://placehold.co/300x450/1f1f1f/444?text=${encodeURIComponent(title||'?')}`)
     : poster(m);
-  const badge  = isSer ? 'SERIE' : m.type === 'documentary' ? 'DOC' : 'FILM';
-  const badgeCls = isSer ? 'card-badge-blue' : 'card-badge-red';
-  // Always use data-series for series so clicks route correctly
-  const key    = isSer
+  const badge   = isSer ? 'SERIE' : m.type === 'documentary' ? 'DOC' : 'FILM';
+  const badgeCls = isSer ? 'card-badge-blue' : (m.type === 'documentary' ? 'card-badge-teal' : 'card-badge-red');
+  const key     = isSer
     ? `data-series="${escAttr(m.series_key || m.series_id || m.series_title || m.title)}"`
     : `data-id="${m.id}"`;
-  const info   = isSer && m.episode_count ? `${m.episode_count} episodios` : (m.year || '');
-  const ratingBadge = topRated && m.rating
+  const info    = isSer && m.episode_count ? `${m.episode_count} ep` : (m.year || '');
+  const ratingBadge = (topRated || m._score != null) && m.rating
     ? `<div class="card-rating-badge"><span class="card-score">${Number(m.rating).toFixed(1)}</span><span class="card-score-label">/10</span></div>`
     : '';
-
   return `
     <div class="card" ${key}>
       <div class="card-inner">
@@ -322,30 +250,212 @@ function wireSection(el) {
 
 function wireCard(c) {
   c.addEventListener('click', () => {
-    if (c.dataset.series) {
-      showSeriesModal(c.dataset.series);
-    } else if (c.dataset.id && c.dataset.id !== 'null' && c.dataset.id !== 'undefined') {
-      showDetail(+c.dataset.id);
-    }
+    if (c.dataset.series) showSeriesModal(c.dataset.series);
+    else if (c.dataset.id && c.dataset.id !== 'null') showDetail(+c.dataset.id);
   });
+}
+
+/* ── HOME ── */
+async function renderHome() {
+  setNavActive('home');
+  document.getElementById('genreBar').style.display = 'none';
+  const wrap = document.getElementById('sections');
+  wrap.innerHTML = '';
+
+  // Continuar viendo (async, no skeleton)
+  renderContinue(wrap);
+
+  // Static sections with skeletons
+  const staticSections = [
+    { title: 'Recomendadas para ti', key: 'recs' },
+    { title: 'Recién añadidas',      key: 'recent' },
+    { title: 'Mejor valoradas',      key: 'top' },
+    { title: 'Porque viste...',      key: 'because' },
+    { title: 'Películas',            key: 'movies' },
+    { title: 'Series',               key: 'series' },
+    { title: 'Documentales',         key: 'docs' },
+  ];
+  const els = {};
+  for (const s of staticSections) {
+    const el = mkSkeleton(s.title); wrap.appendChild(el); els[s.key] = el;
+  }
+
+  // Load in parallel
+  const [recs, recent, top, because, movies, series, docs] = await Promise.allSettled([
+    fetch('/api/user/recommendations?limit=24', { headers: auth() }).then(r => r.json()).catch(() => []),
+    get('/movies/recent'),
+    get('/movies/top'),
+    fetch('/api/user/because-watched?limit=24', { headers: auth() }).then(r => r.json()).catch(() => ({ title: null, items: [] })),
+    get('/movies', { type: 'movie', limit: 24 }),
+    get('/series', { limit: 24 }),
+    get('/movies', { type: 'documentary', limit: 24 }),
+  ]);
+
+  const fill = (el, title, items, isSer = false, isTop = false) => {
+    if (!items?.length) { el.style.display = 'none'; return; }
+    el.innerHTML = buildSectionHTML(title, items, isSer, isTop);
+    wireSection(el);
+  };
+
+  const recsData  = recs.value  || [];
+  const becauseD  = because.value || { title: null, items: [] };
+
+  fill(els.recs,    'Recomendadas para ti',        recsData);
+  fill(els.recent,  'Recién añadidas',              Array.isArray(recent.value) ? recent.value : recent.value?.results || []);
+  fill(els.top,     'Mejor valoradas',              Array.isArray(top.value)    ? top.value    : top.value?.results    || [], false, true);
+  if (becauseD.title && becauseD.items?.length) fill(els.because, `Porque viste: ${becauseD.title}`, becauseD.items);
+  else els.because.style.display = 'none';
+  fill(els.movies,  'Películas',                    movies.value?.results  || []);
+  fill(els.series,  'Series',                       series.value?.results  || [], true);
+  fill(els.docs,    'Documentales',                 docs.value?.results    || []);
+}
+
+async function renderContinue(wrap) {
+  try {
+    const hist   = await fetch('/api/user/history', { headers: auth() }).then(r => r.json());
+    const inProg = hist.filter(m => m.progress > 30 && !m.completed);
+    if (!inProg.length) return;
+    const el = document.createElement('div');
+    el.className = 'section continue-section';
+    el.innerHTML = `
+      <div class="section-header"><div class="section-title">Continuar viendo</div></div>
+      <div class="carousel"><div class="carousel-track">
+        ${inProg.map(m => {
+          const pct = m.h_duration > 0 ? Math.round(m.progress / m.h_duration * 100) : 0;
+          const rem = m.h_duration > 0  ? Math.round((m.h_duration - m.progress) / 60) : 0;
+          return `<div class="continue-card" data-id="${m.id}">
+            <button class="continue-remove" data-id="${m.id}" title="Quitar">×</button>
+            <img class="continue-thumb" src="${poster(m)}" />
+            <div class="continue-bar"><div class="continue-fill" style="width:${pct}%"></div></div>
+            <div class="continue-meta">
+              <div class="continue-title">${escHtml(m.title)}</div>
+              <div class="continue-time">${rem > 0 ? `${rem} min restantes` : 'Casi terminada'}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div></div>`;
+    wrap.prepend(el);
+    el.querySelectorAll('.continue-card').forEach(c => c.addEventListener('click', () => play(+c.dataset.id, c.querySelector('.continue-title')?.textContent || '')));
+    el.querySelectorAll('.continue-remove').forEach(btn => btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await fetch(`/api/user/history/${btn.dataset.id}`, { method: 'DELETE', headers: auth() }).catch(() => {});
+      btn.closest('.continue-card')?.remove();
+      showToast('Quitado de continuar viendo');
+    }));
+  } catch {}
+}
+
+/* ── PER-TYPE NETFLIX PAGES ── */
+async function renderTypeHome(type) {
+  const LABELS = { movie: 'Películas', tv: 'Series', documentary: 'Documentales' };
+  const NAV    = { movie: 'movies',    tv: 'series', documentary: 'documentaries' };
+  const label  = LABELS[type] || type;
+  const isSer  = type === 'tv';
+  setNavActive(NAV[type] || '');
+  document.getElementById('genreBar').style.display = 'none';
+
+  const wrap = document.getElementById('sections');
+  wrap.innerHTML = '';
+
+  // Skeleton rows
+  const skeys = ['recs', 'continue', 'recent', 'top', 'because', 'catalog'];
+  const stitles = ['Recomendadas para ti', 'Continuar viendo', 'Recién añadidas', 'Mejor valoradas', 'Porque viste...', `Todo en ${label}`];
+  const els = {};
+  skeys.forEach((k, i) => { const el = mkSkeleton(stitles[i]); wrap.appendChild(el); els[k] = el; });
+
+  // Fetch all in parallel
+  const [recs, hist, recent, top, because, all] = await Promise.allSettled([
+    fetch(`/api/user/recommendations?type=${type}&limit=24`, { headers: auth() }).then(r => r.json()).catch(() => []),
+    fetch('/api/user/history', { headers: auth() }).then(r => r.json()).catch(() => []),
+    isSer ? get('/series', { limit: 24 }) : get('/movies', { type, limit: 24 }),
+    isSer ? get('/movies/top', { type: 'tv', limit: 24 }) : get('/movies/top', { type, limit: 24 }),
+    fetch(`/api/user/because-watched?type=${type}&limit=24`, { headers: auth() }).then(r => r.json()).catch(() => ({ title: null, items: [] })),
+    isSer ? get('/series', { limit: 300 }) : get('/movies', { type, limit: 300 }),
+  ]);
+
+  const fill = (el, title, items, isSeries = false, isTop = false) => {
+    if (!items?.length) { el.style.display = 'none'; return; }
+    el.innerHTML = buildSectionHTML(title, items, isSeries, isTop);
+    wireSection(el);
+  };
+
+  // Recommendations
+  fill(els.recs, 'Recomendadas para ti', recs.value || []);
+
+  // Continue watching (filtered by type)
+  const histData  = hist.value || [];
+  const inProg    = histData.filter(m => m.progress > 30 && !m.completed && m.type === type);
+  if (inProg.length) {
+    els.continue.className = 'section continue-section';
+    els.continue.innerHTML = `
+      <div class="section-header"><div class="section-title">Continuar viendo</div></div>
+      <div class="carousel"><div class="carousel-track">
+        ${inProg.map(m => {
+          const pct = m.h_duration > 0 ? Math.round(m.progress / m.h_duration * 100) : 0;
+          const rem = m.h_duration > 0  ? Math.round((m.h_duration - m.progress) / 60) : 0;
+          return `<div class="continue-card" data-id="${m.id}">
+            <button class="continue-remove" data-id="${m.id}" title="Quitar">×</button>
+            <img class="continue-thumb" src="${poster(m)}" />
+            <div class="continue-bar"><div class="continue-fill" style="width:${pct}%"></div></div>
+            <div class="continue-meta">
+              <div class="continue-title">${escHtml(m.title)}</div>
+              <div class="continue-time">${rem > 0 ? `${rem} min restantes` : 'Casi terminada'}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div></div>`;
+    els.continue.querySelectorAll('.continue-card').forEach(c => c.addEventListener('click', () => play(+c.dataset.id, c.querySelector('.continue-title')?.textContent || '')));
+    els.continue.querySelectorAll('.continue-remove').forEach(btn => btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await fetch(`/api/user/history/${btn.dataset.id}`, { method: 'DELETE', headers: auth() }).catch(() => {});
+      btn.closest('.continue-card')?.remove();
+      showToast('Quitado de continuar viendo');
+    }));
+  } else {
+    els.continue.style.display = 'none';
+  }
+
+  // Recent
+  fill(els.recent, 'Recién añadidas', isSer ? (recent.value?.results || []) : (recent.value?.results || recent.value || []), isSer);
+
+  // Top rated
+  fill(els.top, 'Mejor valoradas', Array.isArray(top.value) ? top.value : (top.value?.results || []), isSer && Array.isArray(top.value) && top.value[0]?.is_series, true);
+
+  // Because you watched
+  const becauseD = because.value || { title: null, items: [] };
+  if (becauseD.title && becauseD.items?.length) fill(els.because, `Porque viste: ${becauseD.title}`, becauseD.items, isSer);
+  else els.because.style.display = 'none';
+
+  // Catalog — full grid with genre chips
+  const allItems = isSer ? (all.value?.results || []) : (all.value?.results || []);
+  if (allItems.length) {
+    const genres = [...new Set(allItems.flatMap(m => (m.genres || '').split(',').map(g => g.trim()).filter(Boolean)))].sort();
+    const chips  = [`<button class="genre-chip active" data-g="">Todos</button>`,
+      ...genres.map(g => `<button class="genre-chip" data-g="${escAttr(g)}">${escHtml(g)}</button>`)].join('');
+    const gridCards = allItems.map(m => buildCard(m, isSer)).join('');
+    els.catalog.innerHTML = `
+      <div class="section-header"><div class="section-title">Todo en ${escHtml(label)}</div></div>
+      <div class="catalog-chips">${chips}</div>
+      <div class="catalog-grid">${gridCards}</div>`;
+    els.catalog.querySelectorAll('.card').forEach(wireCard);
+    els.catalog.querySelectorAll('.genre-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        els.catalog.querySelectorAll('.genre-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const g = btn.dataset.g;
+        const filtered = g ? allItems.filter(m => (m.genres || '').includes(g)) : allItems;
+        els.catalog.querySelector('.catalog-grid').innerHTML = filtered.map(m => buildCard(m, isSer)).join('');
+        els.catalog.querySelectorAll('.catalog-grid .card').forEach(wireCard);
+      });
+    });
+  } else {
+    els.catalog.style.display = 'none';
+  }
 }
 
 /* ── NAV VIEWS ── */
 function setNavActive(view) {
   document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.view === view));
-}
-
-async function filterByType(type) {
-  setNavActive(type === 'movie' ? 'movies' : type === 'tv' ? 'series' : 'documentaries');
-  if (type === 'tv') {
-    buildGenreBar('tv');
-    const data  = await get('/series', { limit: 300 });
-    renderGrid(type === 'tv' ? 'Series' : 'Películas', data.results || [], true);
-  } else {
-    buildGenreBar(type);
-    const data  = await get('/movies', { type, limit: 300 });
-    renderGrid(type === 'documentary' ? 'Documentales' : 'Películas', data.results || []);
-  }
 }
 
 async function filterByGenre(genre, type = null) {
@@ -358,8 +468,14 @@ async function filterByGenre(genre, type = null) {
 async function doSearch(q) {
   setNavActive('');
   document.getElementById('genreBar').style.display = 'none';
-  const data = await get('/movies', { search: q, limit: 100 });
-  renderGrid(`"${q}"`, data.results || [], false, true);
+  const [moviesData, seriesData] = await Promise.allSettled([
+    get('/movies', { search: q, limit: 60 }),
+    get('/series', { search: q, limit: 20 }),
+  ]);
+  const movies = moviesData.value?.results || [];
+  const series = seriesData.value?.results || [];
+  const items  = [...series, ...movies];
+  renderGrid(`"${q}"`, items, false, true);
 }
 
 async function showFavorites() {
@@ -379,30 +495,30 @@ async function showWatchlist() {
 function renderGrid(title, items, isSeries = false, isSearch = false) {
   const wrap = document.getElementById('sections');
   if (!items.length) {
-    wrap.innerHTML = `<div class="empty"><h2>${title}</h2><p>No hay nada aquí todavía.</p><a href="#" onclick="renderHome();return false">Volver al inicio</a></div>`;
+    wrap.innerHTML = `<div class="empty"><h2>${escHtml(title)}</h2><p>No hay nada aquí todavía.</p><a href="#" onclick="renderHome();return false">Volver al inicio</a></div>`;
     return;
   }
-  const count = isSearch ? ` <span>(${items.length} resultados)</span>` : '';
+  const count = isSearch ? ` <span class="search-count">(${items.length} resultados)</span>` : '';
   wrap.innerHTML = `
     <div class="grid-view">
-      <div class="grid-header"><h2>${title}${count}</h2></div>
-      <div class="grid">${items.map(m => buildCard(m, isSeries)).join('')}</div>
+      <div class="grid-header"><h2>${escHtml(title)}${count}</h2></div>
+      <div class="grid">${items.map(m => buildCard(m, isSeries || !!m.is_series)).join('')}</div>
     </div>`;
   wrap.querySelectorAll('.card').forEach(wireCard);
 }
 
 /* ── NAV LINKS ── */
-document.getElementById('navLogo').addEventListener('click', () => { renderHome(); });
+document.getElementById('navLogo').addEventListener('click', () => renderHome());
 document.querySelectorAll('.nav-link').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
     const v = a.dataset.view;
-    if (v === 'home')          renderHome();
-    else if (v === 'movies')   filterByType('movie');
-    else if (v === 'series')   filterByType('tv');
-    else if (v === 'documentaries') filterByType('documentary');
-    else if (v === 'favorites') showFavorites();
-    else if (v === 'watchlist') showWatchlist();
+    if      (v === 'home')           renderHome();
+    else if (v === 'movies')         renderTypeHome('movie');
+    else if (v === 'series')         renderTypeHome('tv');
+    else if (v === 'documentaries')  renderTypeHome('documentary');
+    else if (v === 'favorites')      showFavorites();
+    else if (v === 'watchlist')      showWatchlist();
   });
 });
 

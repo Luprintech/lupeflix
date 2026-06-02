@@ -91,6 +91,95 @@ router.delete('/history/:movie_id', requireUser, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── RECOMMENDATIONS (content-based filtering) ──
+
+// GET /api/user/recommendations?type=movie|tv|documentary&limit=24
+router.get('/recommendations', requireUser, (req, res) => {
+  const { type, limit = 24 } = req.query;
+
+  const watched = db.prepare(`
+    SELECT m.id, m.genres, m.director
+    FROM watch_history h JOIN movies m ON m.id = h.movie_id
+    WHERE h.user_email = ? AND (h.completed = 1 OR h.progress > 60)
+    ORDER BY h.watched_at DESC LIMIT 40
+  `).all(req.userEmail);
+
+  const watchedIds = watched.map(w => w.id);
+  const genreFreq = {}, dirFreq = {};
+  for (const w of watched) {
+    (w.genres || '').split(',').forEach(g => { const k = g.trim(); if (k) genreFreq[k] = (genreFreq[k] || 0) + 1; });
+    (w.director || '').split(',').forEach(d => { const k = d.trim(); if (k) dirFreq[k] = (dirFreq[k] || 0) + 1; });
+  }
+
+  const buildBase = (extra = '') => {
+    let q = 'SELECT * FROM movies WHERE 1=1';
+    const p = [];
+    if (watchedIds.length) { q += ` AND id NOT IN (${watchedIds.map(() => '?').join(',')})`, p.push(...watchedIds); }
+    if (type) { q += ' AND type = ?'; p.push(type); }
+    q += ` ${extra} LIMIT 500`;
+    return db.prepare(q).all(...p);
+  };
+
+  if (!watchedIds.length || !Object.keys(genreFreq).length) {
+    const rows = buildBase('ORDER BY rating DESC, views DESC');
+    return res.json(rows.slice(0, Number(limit)));
+  }
+
+  const candidates = buildBase('ORDER BY added_at DESC');
+  const topGenres  = Object.keys(genreFreq);
+
+  const scored = candidates
+    .filter(m => (m.genres || '').split(',').some(g => genreFreq[g.trim()]))
+    .map(m => {
+      let s = 0;
+      (m.genres   || '').split(',').forEach(g => { const f = genreFreq[g.trim()];   if (f) s += f * 10; });
+      (m.director || '').split(',').forEach(d => { const f = dirFreq[d.trim()];     if (f) s += f * 5; });
+      s += (m.rating || 0) * 2;
+      s += Math.log1p(m.views || 0);
+      return { ...m, _score: s };
+    })
+    .sort((a, b) => b._score - a._score)
+    .slice(0, Number(limit));
+
+  res.json(scored);
+});
+
+// GET /api/user/because-watched?type=...&limit=24
+router.get('/because-watched', requireUser, (req, res) => {
+  const { type, limit = 24 } = req.query;
+
+  let q = `SELECT m.id, m.title, m.series_title, m.genres
+    FROM watch_history h JOIN movies m ON m.id = h.movie_id
+    WHERE h.user_email = ?`;
+  const p = [req.userEmail];
+  if (type) { q += ' AND m.type = ?'; p.push(type); }
+  q += ' ORDER BY h.watched_at DESC LIMIT 1';
+
+  const last = db.prepare(q).get(...p);
+  if (!last) return res.json({ title: null, items: [] });
+
+  const genres = (last.genres || '').split(',').map(g => g.trim()).filter(Boolean);
+  if (!genres.length) return res.json({ title: null, items: [] });
+
+  const allWatched = db.prepare('SELECT movie_id FROM watch_history WHERE user_email = ?')
+    .all(req.userEmail).map(r => r.movie_id);
+  const exclude = [...new Set([last.id, ...allWatched])];
+  const excPh   = exclude.map(() => '?').join(',');
+
+  let cq = `SELECT * FROM movies WHERE id NOT IN (${excPh})`;
+  const cp = [...exclude];
+  if (type) { cq += ' AND type = ?'; cp.push(type); }
+  cq += ' ORDER BY rating DESC, views DESC LIMIT 300';
+
+  const items = db.prepare(cq).all(...cp)
+    .filter(m => (m.genres || '').split(',').some(g => genres.includes(g.trim())))
+    .slice(0, Number(limit));
+
+  const raw   = last.series_title || last.title || '';
+  const title = raw.length > 45 ? raw.slice(0, 45) + '…' : raw;
+  res.json({ title, items });
+});
+
 // ── SETTINGS ──
 
 router.get('/settings', requireUser, (req, res) => {

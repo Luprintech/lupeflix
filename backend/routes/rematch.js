@@ -108,17 +108,23 @@ function titleCandidates(raw) {
 }
 
 async function autoFindOnTmdb(movie) {
-  const mediaType = movie.type === 'tv' ? 'tv' : 'movie';
-  const endpoint  = `/search/${mediaType}`;
-  for (const q of titleCandidates(movie.title || movie.original_title || '')) {
-    for (const year of movie.year ? [movie.year, null] : [null]) {
-      try {
-        const params = { query: q };
-        if (year) params.year = year;
-        const data = await tmdb(endpoint, 'es-ES', params);
-        const r = (data.results || [])[0];
-        if (r) return { tmdbId: r.id, mediaType };
-      } catch {}
+  // For documentaries, try both movie and tv (many doc series are TV shows on TMDB)
+  const typesToTry = movie.type === 'tv' ? ['tv']
+    : movie.type === 'documentary' ? ['movie', 'tv']
+    : ['movie'];
+
+  for (const mediaType of typesToTry) {
+    const endpoint = `/search/${mediaType}`;
+    for (const q of titleCandidates(movie.title || movie.original_title || '')) {
+      for (const year of movie.year ? [movie.year, null] : [null]) {
+        try {
+          const params = { query: q };
+          if (year) params.year = year;
+          const data = await tmdb(endpoint, 'es-ES', params);
+          const r = (data.results || [])[0];
+          if (r) return { tmdbId: r.id, mediaType };
+        } catch {}
+      }
     }
   }
   return null;

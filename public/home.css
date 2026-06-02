@@ -227,6 +227,7 @@ a { text-decoration: none; color: inherit; }
 }
 .card-badge-red   { background: var(--red); color: #fff; }
 .card-badge-blue  { background: #2980b9; color: #fff; }
+.card-badge-teal  { background: #16a085; color: #fff; }
 .card-badge-green { background: #27ae60; color: #fff; }
 .card-year { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.75); color: rgba(255,255,255,0.7); font-size: 0.6rem; padding: 3px 7px; border-radius: 2px; }
 
@@ -247,6 +248,20 @@ a { text-decoration: none; color: inherit; }
 .grid-header span { color: var(--muted); font-weight: 400; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
 .grid .card { width: 100%; }
+.search-count { color: var(--muted); font-weight: 400; font-size: 0.9rem; margin-left: 8px; }
+
+/* ── CATALOG SECTION (per-type full grid + genre chips) ── */
+.catalog-chips {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 4px 4% 20px;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  padding: 0 4% 40px;
+}
+.catalog-grid .card { width: 100%; }
 
 /* ── CONTINUE WATCHING ── */
 .continue-card {
