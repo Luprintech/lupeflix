@@ -108,6 +108,36 @@ function dedupeItems(items, n) {
   return out;
 }
 
+// Convert individual TV episodes into series-level cards so recommendations
+// don't show "Breaking Bad — S03E07" but rather the full series card.
+function groupTvAsSeriesCards(items) {
+  const seriesMap = new Map();
+  const result    = [];
+  for (const m of items) {
+    if (m.type !== 'tv') { result.push(m); continue; }
+    const key = m.series_id
+      ? `sid:${m.series_id}`
+      : `st:${(m.series_title || m.title || '').toLowerCase().slice(0, 80)}`;
+    if (!seriesMap.has(key)) {
+      const card = {
+        ...m,
+        title:        m.series_title || m.title,
+        series_title: m.series_title || m.title,
+        poster_path:  m.series_poster || m.poster_path,
+        series_poster: m.series_poster || m.poster_path,
+        is_series:    1,
+        episode_count: 1,
+        series_key:   key,
+      };
+      seriesMap.set(key, card);
+      result.push(card);
+    } else {
+      seriesMap.get(key).episode_count += 1;
+    }
+  }
+  return result;
+}
+
 // GET /api/user/recommendations?type=movie|tv|documentary&limit=24
 router.get('/recommendations', requireUser, (req, res) => {
   const { type, limit = 24 } = req.query;
@@ -138,7 +168,8 @@ router.get('/recommendations', requireUser, (req, res) => {
   };
 
   if (!watchedIds.length || !Object.keys(genreFreq).length) {
-    return res.json(dedupeItems(buildBase(), n));
+    const fallback = groupTvAsSeriesCards(dedupeItems(buildBase(), n * 3));
+    return res.json(dedupeItems(fallback, n));
   }
 
   const candidates = buildBase('ORDER BY added_at DESC');
@@ -154,7 +185,9 @@ router.get('/recommendations', requireUser, (req, res) => {
     })
     .sort((a, b) => b._score - a._score);
 
-  res.json(dedupeItems(scored, n));
+  // Group TV episodes into series cards, then deduplicate
+  const grouped = groupTvAsSeriesCards(dedupeItems(scored, n * 5));
+  res.json(dedupeItems(grouped, n));
 });
 
 // GET /api/user/because-watched?type=...&limit=24
@@ -184,9 +217,11 @@ router.get('/because-watched', requireUser, (req, res) => {
   if (type) { cq += ' AND type = ?'; cp.push(type); }
   cq += ' ORDER BY rating DESC, views DESC LIMIT 300';
 
-  const items = db.prepare(cq).all(...cp)
-    .filter(m => (m.genres || '').split(',').some(g => genres.includes(g.trim())))
-    .slice(0, Number(limit));
+  const raw_items = db.prepare(cq).all(...cp)
+    .filter(m => (m.genres || '').split(',').some(g => genres.includes(g.trim())));
+
+  const grouped = groupTvAsSeriesCards(dedupeItems(raw_items, Number(limit) * 3));
+  const items   = dedupeItems(grouped, Number(limit));
 
   const raw   = last.series_title || last.title || '';
   const title = raw.length > 45 ? raw.slice(0, 45) + '…' : raw;

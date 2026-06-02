@@ -217,8 +217,8 @@ function buildCard(m, isSeries = false, topRated = false) {
   const p       = isSer
     ? (img(m.series_poster || m.poster_path) || `https://placehold.co/300x450/1f1f1f/444?text=${encodeURIComponent(title||'?')}`)
     : poster(m);
-  const badge   = isSer ? 'SERIE' : m.type === 'documentary' ? 'DOC' : 'FILM';
-  const badgeCls = isSer ? 'card-badge-blue' : (m.type === 'documentary' ? 'card-badge-teal' : 'card-badge-red');
+  const badge    = isSer ? 'SERIE' : 'FILM';
+  const badgeCls = isSer ? 'card-badge-blue' : 'card-badge-red';
   const key     = isSer
     ? `data-series="${escAttr(m.series_key || m.series_id || m.series_title || m.title)}"`
     : `data-id="${m.id}"`;
@@ -273,7 +273,6 @@ async function renderHome() {
     { title: 'Porque viste...',      key: 'because' },
     { title: 'Películas',            key: 'movies' },
     { title: 'Series',               key: 'series' },
-    { title: 'Documentales',         key: 'docs' },
   ];
   const els = {};
   for (const s of staticSections) {
@@ -281,14 +280,13 @@ async function renderHome() {
   }
 
   // Load in parallel
-  const [recs, recent, top, because, movies, series, docs] = await Promise.allSettled([
+  const [recs, recent, top, because, movies, series] = await Promise.allSettled([
     fetch('/api/user/recommendations?limit=24', { headers: auth() }).then(r => r.json()).catch(() => []),
     get('/movies/recent'),
     get('/movies/top'),
     fetch('/api/user/because-watched?limit=24', { headers: auth() }).then(r => r.json()).catch(() => ({ title: null, items: [] })),
     get('/movies', { type: 'movie', limit: 24 }),
     get('/series', { limit: 24 }),
-    get('/movies', { type: 'documentary', limit: 24 }),
   ]);
 
   const fill = (el, title, items, isSer = false, isTop = false) => {
@@ -297,17 +295,16 @@ async function renderHome() {
     wireSection(el);
   };
 
-  const recsData  = recs.value  || [];
-  const becauseD  = because.value || { title: null, items: [] };
+  const recsData = recs.value || [];
+  const becauseD = because.value || { title: null, items: [] };
 
-  fill(els.recs,    'Recomendadas para ti',        recsData);
-  fill(els.recent,  'Recién añadidas',              Array.isArray(recent.value) ? recent.value : recent.value?.results || []);
-  fill(els.top,     'Mejor valoradas',              Array.isArray(top.value)    ? top.value    : top.value?.results    || [], false, true);
+  fill(els.recs,   'Recomendadas para ti', recsData);
+  fill(els.recent, 'Recién añadidas',      Array.isArray(recent.value) ? recent.value : recent.value?.results || []);
+  fill(els.top,    'Mejor valoradas',      Array.isArray(top.value)    ? top.value    : top.value?.results    || [], false, true);
   if (becauseD.title && becauseD.items?.length) fill(els.because, `Porque viste: ${becauseD.title}`, becauseD.items);
   else els.because.style.display = 'none';
-  fill(els.movies,  'Películas',                    movies.value?.results  || []);
-  fill(els.series,  'Series',                       series.value?.results  || [], true);
-  fill(els.docs,    'Documentales',                 docs.value?.results    || []);
+  fill(els.movies, 'Películas', movies.value?.results || []);
+  fill(els.series, 'Series',    series.value?.results || [], true);
 }
 
 async function renderContinue(wrap) {
@@ -513,12 +510,11 @@ document.querySelectorAll('.nav-link').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
     const v = a.dataset.view;
-    if      (v === 'home')           renderHome();
-    else if (v === 'movies')         renderTypeHome('movie');
-    else if (v === 'series')         renderTypeHome('tv');
-    else if (v === 'documentaries')  renderTypeHome('documentary');
-    else if (v === 'favorites')      showFavorites();
-    else if (v === 'watchlist')      showWatchlist();
+    if      (v === 'home')      renderHome();
+    else if (v === 'movies')    renderTypeHome('movie');
+    else if (v === 'series')    renderTypeHome('tv');
+    else if (v === 'favorites') showFavorites();
+    else if (v === 'watchlist') showWatchlist();
   });
 });
 

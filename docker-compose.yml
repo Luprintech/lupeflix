@@ -15,13 +15,12 @@ services:
       - /volume2/Peliculas Animación:/media/PeliculasAnimacion:ro
       - /volume2/Series:/media/Series:ro
       - /volume2/Series animación:/media/SeriesAnimacion:ro
-      - /volume2/Documentales:/media/Documentales:ro
       # ── Base de datos persistente ──
       - lupeflix_data:/data
     env_file:
       - .env
     environment:
-      MEDIA_DIRS: "/media/Películas,/media/Películas2,/media/PeliculasAnimacion,/media/Series,/media/SeriesAnimacion,/media/Documentales"
+      MEDIA_DIRS: "/media/Películas,/media/Películas2,/media/PeliculasAnimacion,/media/Series,/media/SeriesAnimacion"
 
 volumes:
   lupeflix_data:

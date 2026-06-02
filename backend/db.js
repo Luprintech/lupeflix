@@ -94,4 +94,9 @@ const migrations = [
 ];
 migrations.forEach(m => { if (!existingCols.includes(m.col)) db.exec(m.sql); });
 
+// One-time cleanup: remove documentary content from the library
+db.exec(`DELETE FROM movies WHERE type = 'documentary'`);
+db.exec(`DELETE FROM favorites WHERE movie_id NOT IN (SELECT id FROM movies)`);
+db.exec(`DELETE FROM watch_history WHERE movie_id NOT IN (SELECT id FROM movies)`);
+
 module.exports = db;

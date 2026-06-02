@@ -70,7 +70,7 @@ router.get('/', (req, res) => {
 router.get('/featured', (req, res) => {
   const movies = db.prepare(`
     SELECT * FROM movies
-    WHERE type IN ('movie','documentary')
+    WHERE ${MOVIE_ONLY_CLAUSE}
       AND backdrop_path IS NOT NULL AND backdrop_path != ''
       AND poster_path   IS NOT NULL AND poster_path   != ''
     ORDER BY views DESC, rating DESC NULLS LAST, added_at DESC
@@ -99,13 +99,21 @@ router.get('/featured', (req, res) => {
   res.json(combined);
 });
 
-// RECENT ? movies + unique series only
+// RECENT — movies (deduplicated by tmdb_id) + unique series
 router.get('/recent', (req, res) => {
-  const movies = db.prepare(`
+  const rawMovies = db.prepare(`
     SELECT * FROM movies
-    WHERE type IN ('movie','documentary')
-    ORDER BY added_at DESC LIMIT 20
+    WHERE ${MOVIE_ONLY_CLAUSE}
+    ORDER BY added_at DESC LIMIT 200
   `).all();
+
+  // Deduplicate by tmdb_id (keep first/newest occurrence)
+  const seen = new Set();
+  const movies = rawMovies.filter(m => {
+    const key = m.tmdb_id ? `id:${m.tmdb_id}` : `t:${(m.title || '').toLowerCase().slice(0, 60)}`;
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  }).slice(0, 20);
 
   const series = db.prepare(`
     SELECT
