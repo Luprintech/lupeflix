@@ -504,17 +504,33 @@ function renderGrid(title, items, isSeries = false, isSearch = false) {
   wrap.querySelectorAll('.card').forEach(wireCard);
 }
 
+/* ── ROUTING ── */
+const ROUTES = {
+  home:      () => renderHome(),
+  movies:    () => renderTypeHome('movie'),
+  series:    () => renderTypeHome('tv'),
+  favorites: () => showFavorites(),
+  watchlist: () => showWatchlist(),
+};
+
+function navigate(view) {
+  const safe = ROUTES[view] ? view : 'home';
+  history.pushState({ view: safe }, '', `/home.html#${safe}`);
+  ROUTES[safe]();
+}
+
+window.addEventListener('popstate', e => {
+  const view = e.state?.view || location.hash.slice(1) || 'home';
+  const fn = ROUTES[view];
+  if (fn) { setNavActive(view); fn(); }
+});
+
 /* ── NAV LINKS ── */
-document.getElementById('navLogo').addEventListener('click', () => renderHome());
+document.getElementById('navLogo').addEventListener('click', () => navigate('home'));
 document.querySelectorAll('.nav-link').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
-    const v = a.dataset.view;
-    if      (v === 'home')      renderHome();
-    else if (v === 'movies')    renderTypeHome('movie');
-    else if (v === 'series')    renderTypeHome('tv');
-    else if (v === 'favorites') showFavorites();
-    else if (v === 'watchlist') showWatchlist();
+    navigate(a.dataset.view || 'home');
   });
 });
 
@@ -1067,4 +1083,8 @@ function showToast(msg) {
 
 /* ── INIT ── */
 loadHero();
-renderHome();
+// Read the initial route from the URL hash or default to home
+const _initView = location.hash.slice(1) || 'home';
+const _initFn   = ROUTES[_initView] || ROUTES.home;
+history.replaceState({ view: _initView }, '', `/home.html#${_initView}`);
+_initFn();

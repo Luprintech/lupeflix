@@ -94,9 +94,10 @@ const migrations = [
 ];
 migrations.forEach(m => { if (!existingCols.includes(m.col)) db.exec(m.sql); });
 
-// One-time cleanup: remove documentary content from the library
+// Cleanup: remove all documentary content (by type AND by file path origin)
 db.exec(`DELETE FROM movies WHERE type = 'documentary'`);
-db.exec(`DELETE FROM favorites WHERE movie_id NOT IN (SELECT id FROM movies)`);
+db.exec(`DELETE FROM movies WHERE file_path LIKE '%Documentales%' OR file_path LIKE '%Documentary%' OR file_path LIKE '%Documental%'`);
+db.exec(`DELETE FROM favorites    WHERE movie_id NOT IN (SELECT id FROM movies)`);
 db.exec(`DELETE FROM watch_history WHERE movie_id NOT IN (SELECT id FROM movies)`);
 
 module.exports = db;
