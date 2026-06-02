@@ -7,7 +7,14 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  setHeaders(res, filePath) {
+    if (/\.(?:html|css|js)$/i.test(filePath)) {
+      const type = path.extname(filePath).slice(1) === 'js' ? 'javascript' : path.extname(filePath).slice(1);
+      res.setHeader('Content-Type', `text/${type}; charset=utf-8`);
+    }
+  },
+}));
 
 // ── ROUTES ──
 app.use('/api/movies', require('./routes/movies'));

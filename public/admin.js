@@ -288,7 +288,7 @@ async function searchEditMatches() {
   el.innerHTML = '<p class="muted">Buscando...</p>';
   try {
     const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json());
-    if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el t?tulo original.</p>'; return; }
+    if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el título original.</p>'; return; }
     el.innerHTML = data.results.slice(0, 12).map(item => {
       const title = item.title || item.name || '';
       const year = (item.release_date || item.first_air_date || '').slice(0, 4);

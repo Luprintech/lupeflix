@@ -63,6 +63,18 @@ async function get(path, params = {}) {
   return r.json();
 }
 
+async function readJsonResponse(response, fallbackMessage = 'Error al cargar datos') {
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json')
+    ? await response.json().catch(() => ({}))
+    : { error: await response.text().catch(() => fallbackMessage) };
+  if (!response.ok) {
+    const message = data.error && !String(data.error).includes('<!DOCTYPE') ? data.error : fallbackMessage;
+    throw new Error(message);
+  }
+  return data;
+}
+
 function img(p, size = 'w342') {
   if (!p) return null;
   if (p.startsWith('http')) return p;
@@ -579,8 +591,8 @@ async function showSeriesModal(key) {
   document.getElementById('seasonTabs').innerHTML = '';
 
   try {
-    const data = await fetch(`/api/series/${encodeURIComponent(key)}/seasons`, { headers: auth() }).then(r => r.json());
-    if (data.error) { showToast(data.error); closeOverlay('seriesOverlay'); return; }
+    const response = await fetch(`/api/series/${encodeURIComponent(key)}/seasons`, { headers: auth() });
+    const data = await readJsonResponse(response, 'Error al cargar la serie');
 
     const bg = img(data.backdrop_path, 'original');
     if (bg) document.getElementById('seriesBackdrop').style.backgroundImage = `url(${bg})`;
@@ -673,12 +685,12 @@ async function searchMetadataMatches() {
   results.innerHTML = '<p class="metadata-help">Buscando...</p>';
   try {
     const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json());
-    if (!data.results?.length) { results.innerHTML = '<p class="metadata-help">Sin resultados. Prueba con el t?tulo original.</p>'; return; }
+    if (!data.results?.length) { results.innerHTML = '<p class="metadata-help">Sin resultados. Prueba con el título original.</p>'; return; }
     results.innerHTML = data.results.slice(0, 12).map(item => {
       const title = item.title || item.name || '';
       const year = (item.release_date || item.first_air_date || '').slice(0, 4);
       const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : `https://placehold.co/90x135/222/555?text=${encodeURIComponent(title || '?')}`;
-      return `<button class="metadata-card" data-tmdb="${item.id}" data-type="${type}"><img src="${poster}" /><span><strong>${escHtml(title)}</strong><small>${year || 'Sin a?o'} ? ${Number(item.vote_average || 0).toFixed(1)}/10</small></span></button>`;
+      return `<button class="metadata-card" data-tmdb="${item.id}" data-type="${type}"><img src="${poster}" /><span><strong>${escHtml(title)}</strong><small>${year || 'Sin año'} ? ${Number(item.vote_average || 0).toFixed(1)}/10</small></span></button>`;
     }).join('');
     results.querySelectorAll('.metadata-card').forEach(btn => btn.addEventListener('click', () => applyMetadataMatch(btn.dataset.tmdb, btn.dataset.type)));
   } catch (e) { console.error(e); results.innerHTML = '<p class="metadata-help">Error buscando en TMDB.</p>'; }

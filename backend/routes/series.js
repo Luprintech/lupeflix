@@ -55,6 +55,15 @@ function normalizeEpisode(row) {
   };
 }
 
+function episodeMatchesKey(ep, key) {
+  const normalizedKey = String(key || '').toLowerCase();
+  return ep.series_key === key ||
+    String(ep.series_key || '').toLowerCase() === normalizedKey ||
+    String(ep.series_id || '') === key ||
+    ep.series_title === key ||
+    String(ep.series_title || '').toLowerCase() === normalizedKey.replace(/^title:/, '');
+}
+
 // GET /api/series ? unique series, one card per show.
 router.get('/', (req, res) => {
   const { search, limit = 300 } = req.query;
@@ -111,35 +120,44 @@ router.get('/', (req, res) => {
 
 // GET /api/series/:series_key/seasons
 router.get('/:key/seasons', (req, res) => {
-  const key = decodeURIComponent(req.params.key);
-  const episodes = db.prepare('SELECT * FROM movies WHERE type="tv" ORDER BY COALESCE(season_number,1), COALESCE(episode_number,0), title').all()
-    .map(normalizeEpisode)
-    .filter(ep => ep.series_key === key || String(ep.series_id || '') === key || ep.series_title === key);
+  try {
+    const key = decodeURIComponent(req.params.key);
+    const episodes = db.prepare(`
+      SELECT * FROM movies
+      WHERE type = ?
+      ORDER BY COALESCE(season_number, 1), COALESCE(episode_number, 0), title
+    `).all('tv')
+      .map(normalizeEpisode)
+      .filter(ep => episodeMatchesKey(ep, key));
 
-  if (!episodes.length) return res.status(404).json({ error: 'Series not found', key });
+    if (!episodes.length) return res.status(404).json({ error: 'Serie no encontrada', key });
 
-  const seasons = {};
-  episodes.forEach(ep => {
-    const s = ep.season_number || 1;
-    if (!seasons[s]) seasons[s] = [];
-    seasons[s].push(ep);
-  });
-  Object.values(seasons).forEach(eps => eps.sort((a, b) => (a.episode_number||0) - (b.episode_number||0) || String(a.title).localeCompare(String(b.title))));
+    const seasons = {};
+    episodes.forEach(ep => {
+      const s = ep.season_number || 1;
+      if (!seasons[s]) seasons[s] = [];
+      seasons[s].push(ep);
+    });
+    Object.values(seasons).forEach(eps => eps.sort((a, b) => (a.episode_number||0) - (b.episode_number||0) || String(a.title).localeCompare(String(b.title))));
 
-  const first = episodes[0];
-  res.json({
-    series_key:    first.series_key,
-    series_id:     first.series_id,
-    series_title:  first.series_title,
-    series_poster: first.series_poster || first.poster_path,
-    backdrop_path: first.backdrop_path,
-    description:   first.description,
-    genres:        first.genres,
-    rating:        first.rating,
-    year:          first.year,
-    seasons,
-    episode_count: episodes.length,
-  });
+    const first = episodes[0];
+    res.json({
+      series_key:    first.series_key,
+      series_id:     first.series_id,
+      series_title:  first.series_title,
+      series_poster: first.series_poster || first.poster_path,
+      backdrop_path: first.backdrop_path,
+      description:   first.description,
+      genres:        first.genres,
+      rating:        first.rating,
+      year:          first.year,
+      seasons,
+      episode_count: episodes.length,
+    });
+  } catch (err) {
+    console.error('Error loading series seasons:', err);
+    res.status(500).json({ error: 'Error al cargar la serie' });
+  }
 });
 
 module.exports = router;

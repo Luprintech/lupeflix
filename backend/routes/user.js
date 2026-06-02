@@ -47,8 +47,8 @@ router.delete('/favorites/:movie_id', requireUser, (req, res) => {
 
 // GET /api/user/favorites/check/:movie_id
 router.get('/favorites/check/:movie_id', requireUser, (req, res) => {
-  const fav  = db.prepare('SELECT id FROM favorites WHERE user_email=? AND movie_id=? AND list_type="favorite"').get(req.userEmail, req.params.movie_id);
-  const later = db.prepare('SELECT id FROM favorites WHERE user_email=? AND movie_id=? AND list_type="watchlist"').get(req.userEmail, req.params.movie_id);
+  const fav  = db.prepare('SELECT id FROM favorites WHERE user_email = ? AND movie_id = ? AND list_type = ?').get(req.userEmail, req.params.movie_id, 'favorite');
+  const later = db.prepare('SELECT id FROM favorites WHERE user_email = ? AND movie_id = ? AND list_type = ?').get(req.userEmail, req.params.movie_id, 'watchlist');
   res.json({ is_favorite: !!fav, in_watchlist: !!later });
 });
 
