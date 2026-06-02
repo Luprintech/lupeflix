@@ -68,6 +68,9 @@ function img(p, size = 'w342') {
 function poster(m)   { return img(m.poster_path)  || `https://placehold.co/300x450/1f1f1f/444?text=${encodeURIComponent(m.title||'?')}`; }
 function backdrop(m) { return img(m.backdrop_path, 'original'); }
 
+function escHtml(v) { return String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch])); }
+function escAttr(v) { return escHtml(v); }
+
 /* ── THREE.JS STARS ── */
 function initStars() {
   const canvas = document.getElementById('heroCanvas');
@@ -226,14 +229,21 @@ async function renderContinue(wrap) {
           const pct = m.h_duration > 0 ? Math.round(m.progress / m.h_duration * 100) : 0;
           const rem = m.h_duration  > 0 ? Math.round((m.h_duration - m.progress) / 60) : 0;
           return `<div class="continue-card" data-id="${m.id}">
+            <button class="continue-remove" data-id="${m.id}" title="Quitar de continuar viendo">?</button>
             <img class="continue-thumb" src="${poster(m)}" />
             <div class="continue-bar"><div class="continue-fill" style="width:${pct}%"></div></div>
-            <div class="continue-meta"><div class="continue-title">${m.title}</div><div class="continue-time">${rem > 0 ? `${rem} min restantes` : 'Casi terminada'}</div></div>
+            <div class="continue-meta"><div class="continue-title">${escHtml(m.title)}</div><div class="continue-time">${rem > 0 ? `${rem} min restantes` : 'Casi terminada'}</div></div>
           </div>`;
         }).join('')}
       </div></div>`;
     wrap.appendChild(el);
-    el.querySelectorAll('.continue-card').forEach(c => c.addEventListener('click', () => play(+c.dataset.id, '')));
+    el.querySelectorAll('.continue-card').forEach(c => c.addEventListener('click', () => play(+c.dataset.id, c.querySelector('.continue-title')?.textContent || '')));
+    el.querySelectorAll('.continue-remove').forEach(btn => btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await fetch(`/api/user/history/${btn.dataset.id}`, { method: 'DELETE', headers: auth() }).catch(() => {});
+      btn.closest('.continue-card')?.remove();
+      showToast('Quitado de continuar viendo');
+    }));
   } catch {}
 }
 
@@ -266,7 +276,7 @@ function buildCard(m, isSeries = false, topRated = false) {
   const badgeCls = isSer ? 'card-badge-blue' : 'card-badge-red';
   // Always use data-series for series so clicks route correctly
   const key    = isSer
-    ? `data-series="${m.series_id || encodeURIComponent(m.series_title || m.title)}"`
+    ? `data-series="${escAttr(m.series_id || m.series_title || m.title)}"`
     : `data-id="${m.id}"`;
   const info   = isSer && m.episode_count ? `${m.episode_count} episodios` : (m.year || '');
   const ratingBadge = topRated && m.rating
@@ -276,12 +286,12 @@ function buildCard(m, isSeries = false, topRated = false) {
   return `
     <div class="card" ${key}>
       <div class="card-inner">
-        <img src="${p}" alt="${title}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1f1f1f/444?text=${encodeURIComponent(title||'?')}'" />
+        <img src="${p}" alt="${escAttr(title)}" loading="lazy" onerror="this.src='https://placehold.co/300x450/1f1f1f/444?text=${encodeURIComponent(title||'?')}'" />
         ${ratingBadge}
         <div class="card-badge ${badgeCls}">${badge}</div>
         ${m.year && !topRated && !isSer ? `<div class="card-year">${m.year}</div>` : ''}
         <div class="card-info">
-          <div class="card-title">${title}</div>
+          <div class="card-title">${escHtml(title)}</div>
           ${info ? `<div class="card-sub">${info}</div>` : ''}
         </div>
       </div>
@@ -394,7 +404,7 @@ async function toggleFav(id, list) {
   if (on) await fetch(`/api/user/favorites/${id}?list_type=${list}`, { method: 'DELETE', headers: auth() });
   else    await fetch('/api/user/favorites', { method: 'POST', headers: auth(), body: JSON.stringify({ movie_id: id, list_type: list }) });
   favCache.delete(id);
-  const label = list === 'favorite' ? (on ? 'Eliminado de favoritos' : 'Añadido a favoritos') : (on ? 'Eliminado de la lista' : 'Guardado para ver después');
+  const label = list === 'favorite' ? (on ? 'Eliminado de favoritos' : 'Añadido a favoritos') : (on ? 'Eliminado de lista de seguimiento' : 'Guardado para ver después');
   showToast(label);
   return !on;
 }
@@ -466,17 +476,22 @@ async function showDetail(id) {
     if (extras.cast?.length) {
       document.getElementById('castWrap').style.display = 'block';
       document.getElementById('castRow').innerHTML = extras.cast.map(a => {
-        const ph = a.profile_path ? `https://image.tmdb.org/t/p/w185${a.profile_path}` : `https://placehold.co/86x86/2a2a2a/555?text=${a.name[0]}`;
-        return `<div class="cast-card"><img class="cast-photo" src="${ph}" loading="lazy" /><div class="cast-name">${a.name}</div>${a.character ? `<div class="cast-char">${a.character}</div>` : ''}</div>`;
+        const ph = a.profile_path ? `https://image.tmdb.org/t/p/w185${a.profile_path}` : `https://placehold.co/86x86/2a2a2a/555?text=${encodeURIComponent(a.name?.[0] || '?')}`;
+        return `<div class="cast-card" data-person="${a.id}"><img class="cast-photo" src="${ph}" loading="lazy" /><div class="cast-name">${escHtml(a.name)}</div>${a.character ? `<div class="cast-char">${escHtml(a.character)}</div>` : ''}</div>`;
       }).join('');
+      document.querySelectorAll('.cast-card[data-person]').forEach(c => c.addEventListener('click', () => showPerson(+c.dataset.person)));
     }
+
+    // Providers for the selected title
+    renderProviders(extras.providers);
 
     // Similar
     if (extras.similar?.length) {
       document.getElementById('similarWrap').style.display = 'block';
       document.getElementById('similarRow').innerHTML = extras.similar.map(s => {
         const sp = s.poster_path ? `https://image.tmdb.org/t/p/w185${s.poster_path}` : `https://placehold.co/130x195/2a2a2a/555?text=${encodeURIComponent(s.title||'?')}`;
-        return `<div class="similar-card" data-id="${s.library_id||''}">${s.in_library ? '<span class="similar-in-lib">En biblioteca</span>' : ''}<img src="${sp}" /><div class="similar-card-title">${s.title}</div>${s.rating ? `<div class="similar-card-rating">★ ${Number(s.rating).toFixed(1)}</div>` : ''}</div>`;
+        const availability = !s.in_library && extras.providers ? providerLabel(extras.providers) : '';
+        return `<div class="similar-card" data-id="${s.library_id||''}">${s.in_library ? '<span class="similar-in-lib">En biblioteca</span>' : '<span class="similar-out-lib">Fuera</span>'}<img src="${sp}" /><div class="similar-card-title">${escHtml(s.title)}</div>${s.rating ? `<div class="similar-card-rating">? ${Number(s.rating).toFixed(1)}</div>` : ''}${availability ? `<div class="similar-provider">${escHtml(availability)}</div>` : ''}</div>`;
       }).join('');
       document.querySelectorAll('.similar-card[data-id]').forEach(c => {
         if (c.dataset.id) c.addEventListener('click', () => showDetail(+c.dataset.id));
@@ -484,6 +499,30 @@ async function showDetail(id) {
     }
 
   } catch (e) { console.error(e); showToast('Error al cargar el contenido'); }
+}
+
+
+function providerLabel(providers) {
+  const names = [...(providers?.flatrate || []), ...(providers?.rent || []), ...(providers?.buy || [])]
+    .map(p => p.name).filter(Boolean);
+  return names.length ? `Disponible en ${[...new Set(names)].slice(0, 3).join(', ')}` : 'Sin disponibilidad en España';
+}
+function renderProviders(providers) {
+  const wrap = document.getElementById('providersWrap');
+  const row = document.getElementById('providersRow');
+  if (!wrap || !row) return;
+  const groups = [
+    ['Streaming', providers?.flatrate || []],
+    ['Alquiler', providers?.rent || []],
+    ['Compra', providers?.buy || []],
+  ].filter(([, items]) => items.length);
+  if (!groups.length) { wrap.style.display = 'none'; row.innerHTML = ''; return; }
+  wrap.style.display = 'block';
+  row.innerHTML = groups.map(([label, items]) => `
+    <div class="provider-group"><span>${label}</span>${items.slice(0, 8).map(p => `
+      <a class="provider-pill" href="${providers.link || '#'}" target="_blank" rel="noopener">
+        ${p.logo_path ? `<img src="https://image.tmdb.org/t/p/w45${p.logo_path}" alt="${escAttr(p.name)}" />` : ''}${escHtml(p.name)}
+      </a>`).join('')}</div>`).join('');
 }
 
 function resetDetail() {
@@ -497,8 +536,10 @@ function resetDetail() {
   document.getElementById('trailerFrame').src          = '';
   document.getElementById('castWrap').style.display    = 'none';
   document.getElementById('similarWrap').style.display = 'none';
+  document.getElementById('providersWrap').style.display = 'none';
   document.getElementById('castRow').innerHTML    = '';
   document.getElementById('similarRow').innerHTML = '';
+  document.getElementById('providersRow').innerHTML = '';
   currentTrailer = null;
 }
 
@@ -541,8 +582,8 @@ async function showSeriesModal(key) {
       const favBtn   = document.getElementById('seriesFav');
       const laterBtn = document.getElementById('seriesLater');
       getFavState(firstEp.id).then(s => {
-        if (s.is_favorite)  favBtn.classList.add('fav-active');
-        if (s.in_watchlist) laterBtn.classList.add('later-active');
+        favBtn.classList.toggle('fav-active', !!s.is_favorite);
+        laterBtn.classList.toggle('later-active', !!s.in_watchlist);
       });
       favBtn.onclick = async () => { const on = await toggleFav(firstEp.id, 'favorite'); favBtn.classList.toggle('fav-active', on); };
       laterBtn.onclick = async () => { const on = await toggleFav(firstEp.id, 'watchlist'); laterBtn.classList.toggle('later-active', on); };
@@ -588,36 +629,91 @@ async function showSeriesModal(key) {
 }
 
 /* ── OVERLAYS ── */
+
+async function showPerson(personId) {
+  openOverlay('personOverlay');
+  document.getElementById('personName').textContent = 'Cargando...';
+  document.getElementById('personBio').textContent = '';
+  document.getElementById('personMeta').innerHTML = '';
+  document.getElementById('personCredits').innerHTML = '';
+  document.getElementById('personPhoto').src = 'https://placehold.co/220x330/1f1f1f/555?text=?';
+  try {
+    const data = await fetch(`/api/movies/person/${personId}`, { headers: auth() }).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+    const p = data.person || {};
+    document.getElementById('personName').textContent = p.name || '';
+    document.getElementById('personPhoto').src = p.profile_path ? `https://image.tmdb.org/t/p/w342${p.profile_path}` : 'https://placehold.co/220x330/1f1f1f/555?text=?';
+    document.getElementById('personBio').textContent = p.biography || 'Biograf?a no disponible.';
+    document.getElementById('personMeta').innerHTML = [
+      p.birthday ? `<span>Nacimiento: ${p.birthday}</span>` : '',
+      p.place_of_birth ? `<span>${escHtml(p.place_of_birth)}</span>` : '',
+      p.known_for_department ? `<span>${escHtml(p.known_for_department)}</span>` : '',
+    ].filter(Boolean).join('');
+    document.getElementById('personCredits').innerHTML = (data.credits || []).map(c => {
+      const sp = c.poster_path ? `https://image.tmdb.org/t/p/w185${c.poster_path}` : `https://placehold.co/130x195/2a2a2a/555?text=${encodeURIComponent(c.title||'?')}`;
+      return `<div class="similar-card" data-id="${c.library_id || ''}">${c.in_library ? '<span class="similar-in-lib">En biblioteca</span>' : '<span class="similar-out-lib">Info</span>'}<img src="${sp}" /><div class="similar-card-title">${escHtml(c.title)}</div>${c.character ? `<div class="similar-card-rating">${escHtml(c.character)}</div>` : ''}</div>`;
+    }).join('');
+    document.querySelectorAll('#personCredits .similar-card[data-id]').forEach(c => {
+      if (c.dataset.id) c.addEventListener('click', () => { closeOverlay('personOverlay'); showDetail(+c.dataset.id); });
+    });
+  } catch (e) { console.error(e); showToast('Error al cargar actor'); closeOverlay('personOverlay'); }
+}
+
 function openOverlay(id)  { document.getElementById(id)?.classList.add('open'); document.body.style.overflow = 'hidden'; }
 function closeOverlay(id) { document.getElementById(id)?.classList.remove('open'); document.body.style.overflow = ''; }
 
 document.getElementById('detailClose')?.addEventListener('click', () => closeOverlay('detailOverlay'));
 document.getElementById('seriesClose')?.addEventListener('click', () => closeOverlay('seriesOverlay'));
+document.getElementById('personClose')?.addEventListener('click', () => closeOverlay('personOverlay'));
 document.getElementById('detailOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('detailOverlay'); });
 document.getElementById('seriesOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('seriesOverlay'); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeOverlay('detailOverlay'); closeOverlay('seriesOverlay'); closePlayer(); } });
+document.getElementById('personOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('personOverlay'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeOverlay('detailOverlay'); closeOverlay('seriesOverlay'); closeOverlay('personOverlay'); closePlayer(); } });
 
 /* ── PLAYER ── */
-let progressInterval;
-function play(id, title) {
+let progressInterval, playerUiInterval, currentPlaybackId = null, currentNextEpisode = null;
+async function play(id, title) {
+  currentPlaybackId = id;
+  currentNextEpisode = null;
   document.getElementById('playerTitle').textContent = title;
   const vid = document.getElementById('videoEl');
   vid.src = `/stream/${id}`;
   document.getElementById('player').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
+  fetch(`/api/movies/${id}/next`, { headers: auth() }).then(r => r.json()).then(d => { currentNextEpisode = d.next || null; }).catch(() => {});
+
+  const skipBtn = document.getElementById('skipIntroBtn');
+  const nextBtn = document.getElementById('nextEpisodeBtn');
+  skipBtn.style.display = 'none';
+  nextBtn.style.display = 'none';
+  skipBtn.onclick = () => { vid.currentTime = Math.min((vid.currentTime || 0) + 90, Math.max((vid.duration || 0) - 5, 0)); skipBtn.style.display = 'none'; };
+  nextBtn.onclick = () => { if (currentNextEpisode) play(currentNextEpisode.id, currentNextEpisode.episode_title || currentNextEpisode.title); };
+
   clearInterval(progressInterval);
+  clearInterval(playerUiInterval);
   progressInterval = setInterval(() => {
     if (!vid.paused && !isNaN(vid.duration)) {
       fetch('/api/user/history', { method: 'POST', headers: auth(), body: JSON.stringify({ movie_id: id, progress: Math.floor(vid.currentTime), duration: Math.floor(vid.duration) }) }).catch(() => {});
     }
   }, 12000);
+  playerUiInterval = setInterval(() => {
+    if (isNaN(vid.duration) || !vid.duration) return;
+    skipBtn.style.display = vid.currentTime > 15 && vid.currentTime < 180 ? 'block' : 'none';
+    nextBtn.style.display = currentNextEpisode && (vid.duration - vid.currentTime) < 90 ? 'block' : 'none';
+  }, 1000);
 
-  vid.onended = () => { clearInterval(progressInterval); fetch('/api/user/history', { method: 'POST', headers: auth(), body: JSON.stringify({ movie_id: id, progress: Math.floor(vid.duration || 0), duration: Math.floor(vid.duration || 0) }) }).catch(() => {}); };
+  vid.onended = () => {
+    clearInterval(progressInterval);
+    clearInterval(playerUiInterval);
+    fetch('/api/user/history', { method: 'POST', headers: auth(), body: JSON.stringify({ movie_id: id, progress: Math.floor(vid.duration || 0), duration: Math.floor(vid.duration || 0) }) }).catch(() => {});
+    if (currentNextEpisode) play(currentNextEpisode.id, currentNextEpisode.episode_title || currentNextEpisode.title);
+  };
 }
 document.getElementById('playerClose').addEventListener('click', closePlayer);
 function closePlayer() {
   clearInterval(progressInterval);
+  clearInterval(playerUiInterval);
   const vid = document.getElementById('videoEl');
   vid.pause(); vid.src = '';
   document.getElementById('player').style.display = 'none';

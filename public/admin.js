@@ -157,7 +157,7 @@ function renderMediaList(id, items) {
           ${m.views ? `<span>▶ ${m.views}</span>` : ''}
         </div>
       </div>
-      <div class="media-badge">${m.type === 'movie' ? 'FILM' : 'SERIE'}</div>
+      <div class="media-badge">${m.type === 'documentary' ? 'DOC' : m.type === 'movie' ? 'FILM' : 'SERIE'}</div>
       <div class="media-actions">
         <button class="btn-icon" title="Editar" onclick="openEdit(${m.id})">✏️</button>
       </div>

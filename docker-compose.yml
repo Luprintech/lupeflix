@@ -20,6 +20,8 @@ services:
       - lupeflix_data:/data
     env_file:
       - .env
+    environment:
+      MEDIA_DIRS: "/media/Películas,/media/Películas2,/media/PeliculasAnimacion,/media/Series,/media/SeriesAnimacion,/media/Documentales"
 
 volumes:
   lupeflix_data:

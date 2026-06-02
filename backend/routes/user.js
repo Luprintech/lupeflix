@@ -71,6 +71,7 @@ router.post('/history', requireUser, (req, res) => {
   const { movie_id, progress = 0, duration = 0 } = req.body;
   if (!movie_id) return res.status(400).json({ error: 'movie_id required' });
   const completed = duration > 0 && progress / duration > 0.9 ? 1 : 0;
+  const existing = db.prepare('SELECT id FROM watch_history WHERE user_email = ? AND movie_id = ?').get(req.userEmail, movie_id);
   db.prepare(`
     INSERT INTO watch_history (user_email, movie_id, progress, duration, completed, watched_at)
     VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)
@@ -79,8 +80,8 @@ router.post('/history', requireUser, (req, res) => {
       completed=excluded.completed, watched_at=CURRENT_TIMESTAMP
   `).run(req.userEmail, movie_id, progress, duration, completed);
 
-  // Also increment global views
-  db.prepare('UPDATE movies SET views = views + 1 WHERE id = ?').run(movie_id);
+  // Count one view when the user starts tracking this title, not on every progress heartbeat.
+  if (!existing) db.prepare('UPDATE movies SET views = views + 1 WHERE id = ?').run(movie_id);
   res.json({ ok: true });
 });
 

@@ -162,6 +162,27 @@
   </div>
 </div>
 
+<!-- PERSON MODAL -->
+<div class="overlay" id="personOverlay">
+  <div class="person-modal">
+    <button class="overlay-close" id="personClose">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="person-content">
+      <img id="personPhoto" class="person-photo" src="https://placehold.co/220x330/1f1f1f/555?text=?" alt="" />
+      <div class="person-info">
+        <h2 id="personName"></h2>
+        <div class="person-meta" id="personMeta"></div>
+        <p id="personBio" class="person-bio"></p>
+      </div>
+    </div>
+    <div class="detail-extra">
+      <h3 class="extra-title">Filmograf?a</h3>
+      <div class="similar-row" id="personCredits"></div>
+    </div>
+  </div>
+</div>
+
 <!-- VIDEO PLAYER -->
 <div id="player" style="display:none">
   <div class="player-bar">
@@ -169,6 +190,10 @@
     <button id="playerClose">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
+  </div>
+  <div class="player-actions-floating">
+    <button id="skipIntroBtn" class="player-action-btn" style="display:none">Saltar intro</button>
+    <button id="nextEpisodeBtn" class="player-action-btn" style="display:none">Siguiente episodio</button>
   </div>
   <video id="videoEl" controls autoplay></video>
 </div>
@@ -179,6 +204,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="app.js?v=20260602"></script>
+<script src="app.js?v=20260602-2"></script>
 </body>
 </html>
