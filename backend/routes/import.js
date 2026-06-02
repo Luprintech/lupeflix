@@ -101,7 +101,9 @@ function parseEpisode(filename) {
   if (m) return { season: parseInt(m[1]), episode: parseInt(m[2]) };
   m = filename.match(/\b(\d{1,2})[xX](\d{1,3})\b/);
   if (m) return { season: parseInt(m[1]), episode: parseInt(m[2]) };
-  m = filename.match(/[Ss]eason\s*(\d+).*[Ee]pisode\s*(\d+)/i);
+  m = filename.match(/(?:season|temporada)\s*(\d{1,2}).{0,25}?(?:episode|episodio|cap[ií]tulo|cap\.?|ep\.?|e)\s*(\d{1,3})/i);
+  if (m) return { season: parseInt(m[1]), episode: parseInt(m[2]) };
+  m = filename.match(/(?:season|temporada)\s*(\d{1,2})\D+(\d{1,3})(?!\d)/i);
   if (m) return { season: parseInt(m[1]), episode: parseInt(m[2]) };
   return null;
 }

@@ -9,18 +9,6 @@ const db = new Database(path.join(DATA_DIR, 'lupeflix.db'));
 
 db.pragma('journal_mode = WAL');
 
-// Safe migrations — add columns if they don't exist yet
-const existingCols = db.prepare("PRAGMA table_info(movies)").all().map(c => c.name);
-const migrations = [
-  { col: 'season_number',  sql: 'ALTER TABLE movies ADD COLUMN season_number INTEGER' },
-  { col: 'episode_number', sql: 'ALTER TABLE movies ADD COLUMN episode_number INTEGER' },
-  { col: 'episode_title',  sql: 'ALTER TABLE movies ADD COLUMN episode_title TEXT' },
-  { col: 'series_id',      sql: 'ALTER TABLE movies ADD COLUMN series_id INTEGER' },
-  { col: 'series_title',   sql: 'ALTER TABLE movies ADD COLUMN series_title TEXT' },
-  { col: 'series_poster',  sql: 'ALTER TABLE movies ADD COLUMN series_poster TEXT' },
-];
-migrations.forEach(m => { if (!existingCols.includes(m.col)) db.exec(m.sql); });
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS movies (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,5 +77,19 @@ db.exec(`
     updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Safe migrations - add columns if they don't exist yet.
+// Keep this after CREATE TABLE so a fresh database can bootstrap cleanly.
+const existingCols = db.prepare('PRAGMA table_info(movies)').all().map(c => c.name);
+const migrations = [
+  { col: 'season_number',    sql: 'ALTER TABLE movies ADD COLUMN season_number INTEGER' },
+  { col: 'episode_number',   sql: 'ALTER TABLE movies ADD COLUMN episode_number INTEGER' },
+  { col: 'episode_title',    sql: 'ALTER TABLE movies ADD COLUMN episode_title TEXT' },
+  { col: 'episode_air_date', sql: 'ALTER TABLE movies ADD COLUMN episode_air_date TEXT' },
+  { col: 'series_id',        sql: 'ALTER TABLE movies ADD COLUMN series_id INTEGER' },
+  { col: 'series_title',     sql: 'ALTER TABLE movies ADD COLUMN series_title TEXT' },
+  { col: 'series_poster',    sql: 'ALTER TABLE movies ADD COLUMN series_poster TEXT' },
+];
+migrations.forEach(m => { if (!existingCols.includes(m.col)) db.exec(m.sql); });
 
 module.exports = db;

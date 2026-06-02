@@ -589,6 +589,8 @@ async function showSeriesModal(key) {
   document.getElementById('seriesTitle').textContent = '...';
   document.getElementById('episodeList').innerHTML = '<p style="color:rgba(255,255,255,0.4);padding:20px">Cargando...</p>';
   document.getElementById('seasonTabs').innerHTML = '';
+  document.getElementById('seasonSelect').innerHTML = '';
+  document.getElementById('seasonSummary').textContent = 'Cargando temporadas...';
 
   try {
     const response = await fetch(`/api/series/${encodeURIComponent(key)}/seasons`, { headers: auth() });
@@ -601,6 +603,7 @@ async function showSeriesModal(key) {
     document.getElementById('seriesMeta').innerHTML = [
       data.rating ? `<span class="series-meta-chip">★ ${Number(data.rating).toFixed(1)}</span>` : '',
       data.year   ? `<span>${data.year}</span>` : '',
+      data.season_count ? `<span>${data.season_count} temporadas</span>` : '',
       `<span>${data.episode_count} episodios</span>`,
     ].filter(Boolean).join('');
 
@@ -622,26 +625,58 @@ async function showSeriesModal(key) {
       laterBtn.onclick = async () => { const on = await toggleFav(firstEp.id, 'watchlist'); laterBtn.classList.toggle('later-active', on); };
     }
 
+    const identifyBtn = document.getElementById('seriesIdentify');
+    if (identifyBtn) {
+      identifyBtn.style.display = isAdminUser ? 'inline-flex' : 'none';
+      identifyBtn.onclick = async () => {
+        identifyBtn.disabled = true;
+        identifyBtn.textContent = 'Identificando...';
+        try {
+          const r = await fetch(`/api/series/${encodeURIComponent(key)}/refresh-metadata`, {
+            method: 'POST',
+            headers: auth(),
+          });
+          await readJsonResponse(r, 'Error identificando episodios');
+          favCache.clear();
+          showToast('Metadatos de episodios actualizados');
+          showSeriesModal(key);
+        } catch (err) {
+          showToast(err.message || 'Error identificando episodios');
+        } finally {
+          identifyBtn.disabled = false;
+          identifyBtn.textContent = 'Identificar episodios';
+        }
+      };
+    }
+
     const seasons = Object.keys(data.seasons).sort((a, b) => +a - +b);
     const tabsEl  = document.getElementById('seasonTabs');
+    const selectEl = document.getElementById('seasonSelect');
     tabsEl.innerHTML = seasons.map((s, i) =>
       `<button class="season-tab ${i === 0 ? 'active' : ''}" data-s="${s}">Temporada ${s} <span style="opacity:.5;font-size:0.7rem">(${data.seasons[s].length})</span></button>`
     ).join('');
+    selectEl.innerHTML = seasons.map(s => `<option value="${s}">Temporada ${s} (${data.seasons[s].length})</option>`).join('');
 
     function showSeason(sn) {
       tabsEl.querySelectorAll('.season-tab').forEach(t => t.classList.toggle('active', t.dataset.s === String(sn)));
+      if (selectEl.value !== String(sn)) selectEl.value = String(sn);
       const eps = data.seasons[sn] || [];
+      document.getElementById('seasonSummary').textContent = `${eps.length} episodios disponibles en la temporada ${sn}`;
       document.getElementById('episodeList').innerHTML = eps.map(ep => {
         const th  = ep.poster_path ? img(ep.poster_path, 'w300') : `https://placehold.co/120x68/2a2a2a/555?text=E${ep.episode_number||'?'}`;
         const num = ep.episode_number ? String(ep.episode_number).padStart(2, '0') : '??';
+        const meta = [
+          ep.duration ? `${ep.duration} min` : '',
+          (ep.episode_air_date || ep.air_date) ? `<span class="ep-air-date">${escHtml(ep.episode_air_date || ep.air_date)}</span>` : '',
+        ].filter(Boolean).join(' · ');
         return `
           <div class="episode-item" data-id="${ep.id}">
             <div class="ep-num">${num}</div>
             <img class="ep-thumb" src="${th}" loading="lazy" />
             <div class="ep-body">
-              <div class="ep-title">${ep.episode_title || `Episodio ${num}`}</div>
-              ${ep.description ? `<div class="ep-desc">${ep.description}</div>` : ''}
-              ${ep.duration ? `<div class="ep-meta">${ep.duration} min</div>` : ''}
+              <div class="ep-title">${escHtml(ep.episode_title || `Episodio ${num}`)}</div>
+              ${ep.description ? `<div class="ep-desc">${escHtml(ep.description)}</div>` : ''}
+              ${meta ? `<div class="ep-meta">${meta}</div>` : ''}
             </div>
             ${ep.file_path ? `<button class="ep-play-btn" data-id="${ep.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></button>` : ''}
           </div>`;
@@ -656,6 +691,7 @@ async function showSeriesModal(key) {
     }
 
     tabsEl.querySelectorAll('.season-tab').forEach(t => t.addEventListener('click', () => showSeason(t.dataset.s)));
+    selectEl.onchange = () => showSeason(selectEl.value);
     if (seasons.length) showSeason(seasons[0]);
 
   } catch (e) { console.error(e); showToast('Error al cargar la serie'); }
