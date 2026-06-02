@@ -97,13 +97,13 @@
       <div class="series-meta" id="seriesMeta"></div>
       <p class="series-desc" id="seriesDesc"></p>
       <div class="series-btns">
-        <button class="icon-btn icon-btn-fav" id="seriesFav" aria-label="Favorito">
+        <button type="button" class="icon-btn icon-btn-fav" id="seriesFav" aria-label="Añadir a favoritos" title="Favoritos">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </button>
-        <button class="icon-btn icon-btn-later" id="seriesLater" aria-label="Ver después">
+        <button type="button" class="icon-btn icon-btn-later" id="seriesLater" aria-label="Añadir a ver después" title="Ver después">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </button>
-        <button class="btn-trailer series-identify-btn" id="seriesIdentify" style="display:none">Identificar episodios</button>
+        <button type="button" class="btn-trailer series-identify-btn" id="seriesIdentify" style="display:none">Identificar episodios</button>
       </div>
     </div>
     <div class="episodes-panel">
@@ -112,10 +112,13 @@
           <h3>Temporadas</h3>
           <p id="seasonSummary">Selecciona una temporada</p>
         </div>
-        <label class="season-select-wrap">
-          <span>Temporada</span>
-          <select id="seasonSelect"></select>
-        </label>
+        <div class="season-dropdown" id="seasonDropdown">
+          <button type="button" class="season-dropdown-btn" id="seasonDropdownBtn" aria-haspopup="listbox" aria-expanded="false">
+            <span id="seasonDropdownLabel">Temporada</span>
+            <svg class="season-dropdown-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="season-dropdown-menu" id="seasonDropdownMenu" role="listbox" aria-label="Seleccionar temporada"></div>
+        </div>
       </div>
       <div class="episode-list" id="episodeList"></div>
     </div>
@@ -236,6 +239,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="app.js?v=20260602-7"></script>
+<script src="app.js?v=20260602-8"></script>
 </body>
 </html>

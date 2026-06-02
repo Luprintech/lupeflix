@@ -586,47 +586,83 @@ document.getElementById('trailerDismiss').addEventListener('click', () => {
 /* ── SERIES MODAL ── */
 async function showSeriesModal(key) {
   openOverlay('seriesOverlay');
-  document.getElementById('seriesTitle').textContent = '...';
-  document.getElementById('episodeList').innerHTML = '<p style="color:rgba(255,255,255,0.4);padding:20px">Cargando...</p>';
-  document.getElementById('seasonSelect').innerHTML = '';
-  document.getElementById('seasonSummary').textContent = 'Cargando temporadas...';
+
+  const titleEl = document.getElementById('seriesTitle');
+  const descEl = document.getElementById('seriesDesc');
+  const metaEl = document.getElementById('seriesMeta');
+  const backdropEl = document.getElementById('seriesBackdrop');
+  const episodeList = document.getElementById('episodeList');
+  const seasonSummary = document.getElementById('seasonSummary');
+  const dropdown = document.getElementById('seasonDropdown');
+  const dropdownBtn = document.getElementById('seasonDropdownBtn');
+  const dropdownLabel = document.getElementById('seasonDropdownLabel');
+  const dropdownMenu = document.getElementById('seasonDropdownMenu');
+
+  titleEl.textContent = '...';
+  descEl.textContent = '';
+  metaEl.innerHTML = '';
+  episodeList.innerHTML = '<p class="series-loading">Cargando...</p>';
+  seasonSummary.textContent = 'Cargando temporadas...';
+  dropdown?.classList.remove('open');
+  if (dropdownBtn) dropdownBtn.setAttribute('aria-expanded', 'false');
+  if (dropdownLabel) dropdownLabel.textContent = 'Temporada';
+  if (dropdownMenu) dropdownMenu.innerHTML = '';
 
   try {
     const response = await fetch(`/api/series/${encodeURIComponent(key)}/seasons`, { headers: auth() });
     const data = await readJsonResponse(response, 'Error al cargar la serie');
 
     const bg = img(data.backdrop_path, 'original');
-    if (bg) document.getElementById('seriesBackdrop').style.backgroundImage = `url(${bg})`;
-    document.getElementById('seriesTitle').textContent = data.series_title;
-    document.getElementById('seriesDesc').textContent  = data.description || '';
-    document.getElementById('seriesMeta').innerHTML = [
-      data.rating ? `<span class="series-meta-chip">★ ${Number(data.rating).toFixed(1)}</span>` : '',
-      data.year   ? `<span>${data.year}</span>` : '',
-      data.season_count ? `<span>${data.season_count} temporadas</span>` : '',
-      `<span>${data.episode_count} episodios</span>`,
+    backdropEl.style.backgroundImage = bg ? `url(${bg})` : '';
+    titleEl.textContent = data.series_title || 'Serie';
+    descEl.textContent = data.description || '';
+    metaEl.innerHTML = [
+      data.rating ? `<span class="series-meta-chip">&#9733; ${Number(data.rating).toFixed(1)}</span>` : '',
+      data.year ? `<span>${escHtml(String(data.year))}</span>` : '',
+      data.season_count ? `<span>${Number(data.season_count)} temporadas</span>` : '',
+      `<span>${Number(data.episode_count || 0)} episodios</span>`,
     ].filter(Boolean).join('');
 
-    // Fav/later for series (using first episode id as proxy)
-    const firstEp = Object.values(data.seasons)[0]?.[0];
-    const favBtn   = document.getElementById('seriesFav');
+    // Favoritos/ver después para la serie usando el primer episodio como proxy hasta tener entidad serie propia.
+    const firstEp = Object.values(data.seasons || {})[0]?.[0];
+    const favBtn = document.getElementById('seriesFav');
     const laterBtn = document.getElementById('seriesLater');
-    favBtn.classList.remove('fav-active');
-    laterBtn.classList.remove('later-active');
-    favBtn.onclick = null;
-    laterBtn.onclick = null;
+    [favBtn, laterBtn].forEach(btn => {
+      if (!btn) return;
+      btn.classList.remove('fav-active', 'later-active');
+      btn.disabled = false;
+      btn.onclick = null;
+    });
     if (firstEp) {
       getFavState(firstEp.id).then(s => {
-        favBtn.classList.toggle('fav-active', !!s.is_favorite);
-        laterBtn.classList.toggle('later-active', !!s.in_watchlist);
+        favBtn?.classList.toggle('fav-active', !!s.is_favorite);
+        laterBtn?.classList.toggle('later-active', !!s.in_watchlist);
       });
-      favBtn.onclick = async () => { const on = await toggleFav(firstEp.id, 'favorite'); favBtn.classList.toggle('fav-active', on); };
-      laterBtn.onclick = async () => { const on = await toggleFav(firstEp.id, 'watchlist'); laterBtn.classList.toggle('later-active', on); };
+      favBtn.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const on = await toggleFav(firstEp.id, 'favorite');
+        favBtn.classList.toggle('fav-active', on);
+        showToast(on ? 'Serie añadida a favoritos' : 'Serie quitada de favoritos');
+      };
+      laterBtn.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const on = await toggleFav(firstEp.id, 'watchlist');
+        laterBtn.classList.toggle('later-active', on);
+        showToast(on ? 'Serie añadida a ver después' : 'Serie quitada de ver después');
+      };
+    } else {
+      favBtn.disabled = true;
+      laterBtn.disabled = true;
     }
 
     const identifyBtn = document.getElementById('seriesIdentify');
     if (identifyBtn) {
       identifyBtn.style.display = isAdminUser ? 'inline-flex' : 'none';
-      identifyBtn.onclick = async () => {
+      identifyBtn.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
         identifyBtn.disabled = true;
         identifyBtn.textContent = 'Identificando...';
         try {
@@ -647,16 +683,60 @@ async function showSeriesModal(key) {
       };
     }
 
-    const seasons = Object.keys(data.seasons).sort((a, b) => +a - +b);
-    const selectEl = document.getElementById('seasonSelect');
-    selectEl.innerHTML = seasons.map(s => `<option value="${s}">Temporada ${s} (${data.seasons[s].length})</option>`).join('');
+    const seasons = Object.keys(data.seasons || {}).sort((a, b) => +a - +b);
+    let activeSeason = seasons[0] || '';
+
+    function closeSeasonDropdown() {
+      dropdown?.classList.remove('open');
+      dropdownBtn?.setAttribute('aria-expanded', 'false');
+    }
+
+    function renderSeasonMenu() {
+      if (!dropdownMenu) return;
+      dropdownMenu.innerHTML = seasons.map(sn => {
+        const count = data.seasons[sn]?.length || 0;
+        const active = String(sn) === String(activeSeason) ? ' active' : '';
+        return `<button type="button" class="season-option${active}" data-season="${escHtml(String(sn))}" role="option" aria-selected="${active ? 'true' : 'false'}">
+          <span>Temporada ${escHtml(String(sn))}</span>
+          <small>${count} episodios</small>
+        </button>`;
+      }).join('');
+      dropdownMenu.querySelectorAll('.season-option').forEach(option => {
+        option.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          showSeason(option.dataset.season);
+          closeSeasonDropdown();
+        });
+      });
+    }
+
+    dropdownBtn.onclick = event => {
+      event.preventDefault();
+      event.stopPropagation();
+      dropdown?.classList.toggle('open');
+      dropdownBtn.setAttribute('aria-expanded', dropdown?.classList.contains('open') ? 'true' : 'false');
+    };
+    if (!window.__lupeflixSeasonDropdownOutsideBound) {
+      document.addEventListener('click', event => {
+        const d = document.getElementById('seasonDropdown');
+        if (d && !d.contains(event.target)) {
+          d.classList.remove('open');
+          document.getElementById('seasonDropdownBtn')?.setAttribute('aria-expanded', 'false');
+        }
+      });
+      window.__lupeflixSeasonDropdownOutsideBound = true;
+    }
 
     function showSeason(sn) {
-      if (selectEl.value !== String(sn)) selectEl.value = String(sn);
-      const eps = data.seasons[sn] || [];
-      document.getElementById('seasonSummary').textContent = `${eps.length} episodios disponibles en la temporada ${sn}`;
-      document.getElementById('episodeList').innerHTML = eps.map(ep => {
-        const th  = ep.poster_path ? img(ep.poster_path, 'w300') : `https://placehold.co/120x68/2a2a2a/555?text=E${ep.episode_number||'?'}`;
+      activeSeason = String(sn);
+      const eps = data.seasons[activeSeason] || [];
+      if (dropdownLabel) dropdownLabel.textContent = `Temporada ${activeSeason}`;
+      seasonSummary.textContent = `${eps.length} episodios disponibles en la temporada ${activeSeason}`;
+      renderSeasonMenu();
+
+      episodeList.innerHTML = eps.map(ep => {
+        const th = ep.poster_path ? img(ep.poster_path, 'w300') : `https://placehold.co/142x80/2a2a2a/777?text=E${ep.episode_number || '?'}`;
         const num = ep.episode_number ? String(ep.episode_number).padStart(2, '0') : '??';
         const meta = [
           ep.duration ? `${ep.duration} min` : '',
@@ -665,31 +745,49 @@ async function showSeriesModal(key) {
         return `
           <div class="episode-item" data-id="${ep.id}">
             <div class="ep-num">${num}</div>
-            <img class="ep-thumb" src="${th}" loading="lazy" />
+            <img class="ep-thumb" src="${th}" loading="lazy" alt="${escHtml(ep.episode_title || `Episodio ${num}`)}" />
             <div class="ep-body">
               <div class="ep-title">${escHtml(ep.episode_title || `Episodio ${num}`)}</div>
               ${ep.description ? `<div class="ep-desc">${escHtml(ep.description)}</div>` : ''}
               ${meta ? `<div class="ep-meta">${meta}</div>` : ''}
             </div>
-            ${ep.file_path ? `<button class="ep-play-btn" data-id="${ep.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></button>` : ''}
+            ${ep.file_path ? `<button type="button" class="ep-play-btn" data-id="${ep.id}" aria-label="Reproducir episodio"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg></button>` : '<span></span>'}
           </div>`;
       }).join('');
 
-      document.querySelectorAll('.episode-item').forEach(item => {
-        item.addEventListener('click', () => { closeOverlay('seriesOverlay'); play(+item.dataset.id, item.querySelector('.ep-title')?.textContent || ''); });
+      episodeList.querySelectorAll('.episode-item').forEach(item => {
+        item.addEventListener('click', event => {
+          if (event.target.closest('button')) return;
+          closeOverlay('seriesOverlay');
+          play(+item.dataset.id, item.querySelector('.ep-title')?.textContent || '');
+        });
       });
-      document.querySelectorAll('.ep-play-btn').forEach(btn => {
-        btn.addEventListener('click', e => { e.stopPropagation(); closeOverlay('seriesOverlay'); play(+btn.dataset.id, ''); });
+      episodeList.querySelectorAll('.ep-play-btn').forEach(btn => {
+        btn.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          closeOverlay('seriesOverlay');
+          play(+btn.dataset.id, '');
+        });
       });
     }
 
-    selectEl.onchange = () => showSeason(selectEl.value);
-    if (seasons.length) showSeason(seasons[0]);
+    renderSeasonMenu();
+    if (seasons.length) showSeason(activeSeason);
+    else {
+      seasonSummary.textContent = 'No hay episodios disponibles todavía';
+      episodeList.innerHTML = '<p class="series-loading">No hay episodios disponibles.</p>';
+    }
 
-  } catch (e) { console.error(e); showToast('Error al cargar la serie'); }
+  } catch (e) {
+    console.error(e);
+    document.getElementById('seasonSummary').textContent = 'No se pudo cargar esta serie';
+    document.getElementById('episodeList').innerHTML = '<p class="series-loading">Error al cargar la serie.</p>';
+    showToast('Error al cargar la serie');
+  }
 }
 
-/* ── OVERLAYS ── */
+/* OVERLAYS */
 
 
 let metadataTarget = null;
