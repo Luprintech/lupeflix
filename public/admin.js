@@ -119,25 +119,56 @@ async function loadDashboard() {
 
 // ── LIBRARY ──
 let libTimer;
-async function loadLibrary(search = '', type = '') {
-  const p = new URLSearchParams({ limit: 200 });
-  if (search) p.set('search', search);
-  if (type)   p.set('type', type);
+async function loadLibrary(search = '', type = '', meta = '') {
+  const el = document.getElementById('libraryList');
+  el.innerHTML = '<p class="muted" style="padding:12px 0">Cargando...</p>';
   try {
-    const data = await apiFetch(`/movies?${p}`);
-    renderMediaList('libraryList', data.results);
-  } catch {}
+    let items = [];
+
+    if (!type || type === 'movie') {
+      const p = new URLSearchParams({ limit: 500, type: 'movie' });
+      if (search) p.set('search', search);
+      const d = await apiFetch(`/movies?${p}`);
+      items.push(...d.results);
+    }
+    if (!type || type === 'documentary') {
+      const p = new URLSearchParams({ limit: 200, type: 'documentary' });
+      if (search) p.set('search', search);
+      const d = await apiFetch(`/movies?${p}`);
+      items.push(...d.results);
+    }
+    if (!type || type === 'tv') {
+      const p = new URLSearchParams({ limit: 500 });
+      if (search) p.set('search', search);
+      const d = await apiFetch(`/series?${p}`);
+      items.push(...d.results);
+    }
+
+    if (meta === 'no_meta')   items = items.filter(m => m.is_series ? !m.series_id : !m.tmdb_id);
+    if (meta === 'with_meta') items = items.filter(m => m.is_series ?  !!m.series_id :  !!m.tmdb_id);
+    if (meta === 'no_file')   items = items.filter(m => !m.is_series && !m.file_path);
+
+    items.sort((a, b) => new Date(b.added_at || 0) - new Date(a.added_at || 0));
+    renderLibraryList('libraryList', items);
+  } catch (err) {
+    el.innerHTML = `<p class="muted" style="padding:12px 0">Error al cargar: ${escHtml(err.message)}</p>`;
+  }
 }
+
+function getLibFilters() {
+  return [
+    document.getElementById('libSearch').value,
+    document.getElementById('libType').value,
+    document.getElementById('libMeta').value,
+  ];
+}
+
 document.getElementById('libSearch').addEventListener('input', () => {
   clearTimeout(libTimer);
-  libTimer = setTimeout(() => loadLibrary(
-    document.getElementById('libSearch').value,
-    document.getElementById('libType').value
-  ), 300);
+  libTimer = setTimeout(() => loadLibrary(...getLibFilters()), 300);
 });
-document.getElementById('libType').addEventListener('change', () =>
-  loadLibrary(document.getElementById('libSearch').value, document.getElementById('libType').value)
-);
+document.getElementById('libType').addEventListener('change', () => loadLibrary(...getLibFilters()));
+document.getElementById('libMeta').addEventListener('change', () => loadLibrary(...getLibFilters()));
 
 function escHtml(v) { return String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch])); }
 
@@ -164,6 +195,148 @@ function renderMediaList(id, items) {
         <button class="btn-icon" title="Editar" onclick="openEdit(${m.id})">✏️</button>
       </div>
     </div>`).join('');
+}
+
+function renderLibraryList(id, items) {
+  const el = document.getElementById(id);
+  if (!items?.length) { el.innerHTML = '<p class="muted" style="padding:12px 0">Sin títulos.</p>'; return; }
+  el.innerHTML = items.map((m, i) => {
+    const hasMeta = m.is_series ? !!m.series_id : !!m.tmdb_id;
+    const metaBadge = hasMeta
+      ? `<span class="badge-meta-ok">✓ Metadata</span>`
+      : `<span class="badge-meta-warn">⚠ Sin metadata</span>`;
+
+    if (m.is_series) {
+      const epInfo = [
+        m.episode_count ? `${m.episode_count} ep` : '',
+        m.season_count > 1 ? `${m.season_count} temp` : '',
+      ].filter(Boolean).join(', ');
+      return `
+        <div class="media-item media-series" data-idx="${i}" data-series-key="${escHtml(m.series_key || m.title)}">
+          <img class="media-poster"
+            src="${imgUrl(m.series_poster || m.poster_path) || 'https://placehold.co/44x60/16162a/444?text=?'}"
+            alt="" onerror="this.src='https://placehold.co/44x60/16162a/444?text=?'" />
+          <div class="media-info">
+            <div class="media-title">${escHtml(m.series_title || m.title)}</div>
+            <div class="media-meta">
+              ${m.year ? `<span>${m.year}</span>` : ''}
+              ${m.genres ? `<span>${escHtml(m.genres.split(',')[0].trim())}</span>` : ''}
+              ${m.rating ? `<span>⭐ ${Number(m.rating).toFixed(1)}</span>` : ''}
+              ${epInfo ? `<span>${epInfo}</span>` : ''}
+              ${metaBadge}
+            </div>
+          </div>
+          <div class="media-badge">SERIE</div>
+          <div class="media-actions">
+            <button class="btn-icon btn-toggle" title="Ver episodios" onclick="toggleSeriesEpisodes(${i})">▶</button>
+            <button class="btn-icon" title="Actualizar metadata de serie" onclick="refreshSeriesMeta(${i})">🔄</button>
+          </div>
+        </div>
+        <div class="series-episodes-panel" id="sep-${i}" style="display:none"></div>`;
+    }
+
+    const badge = m.type === 'documentary' ? 'DOC' : 'FILM';
+    const fileBadge = m.file_path
+      ? `<span class="badge-file-ok">✓ Archivo</span>`
+      : `<span class="badge-file-warn">Sin archivo</span>`;
+    return `
+      <div class="media-item">
+        <img class="media-poster"
+          src="${imgUrl(m.poster_path) || 'https://placehold.co/44x60/16162a/444?text=?'}"
+          alt="" onerror="this.src='https://placehold.co/44x60/16162a/444?text=?'" />
+        <div class="media-info">
+          <div class="media-title">${escHtml(m.title)}</div>
+          <div class="media-meta">
+            ${m.year ? `<span>${m.year}</span>` : ''}
+            ${m.genres ? `<span>${escHtml(m.genres.split(',')[0].trim())}</span>` : ''}
+            ${m.rating ? `<span>⭐ ${Number(m.rating).toFixed(1)}</span>` : ''}
+            ${fileBadge}
+            ${metaBadge}
+            ${m.views ? `<span>▶ ${m.views}</span>` : ''}
+          </div>
+        </div>
+        <div class="media-badge">${badge}</div>
+        <div class="media-actions">
+          <button class="btn-icon" title="Editar" onclick="openEdit(${m.id})">✏️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function toggleSeriesEpisodes(idx) {
+  const panel = document.getElementById(`sep-${idx}`);
+  const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
+  const btn = seriesEl?.querySelector('.btn-toggle');
+  if (!panel) return;
+
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    if (btn) btn.textContent = '▶';
+    return;
+  }
+
+  panel.style.display = 'block';
+  if (btn) btn.textContent = '▼';
+  if (panel.dataset.loaded) return;
+
+  const seriesKey = seriesEl.dataset.seriesKey;
+  panel.innerHTML = '<p class="muted" style="padding:10px 60px">Cargando episodios...</p>';
+  try {
+    const data = await apiFetch(`/series/${encodeURIComponent(seriesKey)}/seasons`);
+    renderEpisodesPanel(panel, data);
+    panel.dataset.loaded = '1';
+  } catch (err) {
+    panel.innerHTML = `<p class="muted" style="padding:10px 60px">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+function renderEpisodesPanel(panel, data) {
+  const seasons = data.seasons || {};
+  const sortedSeasons = Object.entries(seasons).sort((a, b) => Number(a[0]) - Number(b[0]));
+  let html = '<div class="episodes-container">';
+  for (const [sNum, episodes] of sortedSeasons) {
+    html += `<div class="season-header">Temporada ${escHtml(sNum)}</div>`;
+    html += episodes.map(ep => {
+      const s = String(ep.season_number || 1).padStart(2, '0');
+      const e = String(ep.episode_number || 0).padStart(2, '0');
+      const code = ep.episode_number ? `<span class="ep-code">S${s}E${e}</span>` : '';
+      const title = escHtml(ep.episode_title || ep.title || '');
+      const hasMeta = !!(ep.tmdb_id || ep.series_id);
+      return `
+        <div class="episode-item">
+          <img class="ep-thumb"
+            src="${imgUrl(ep.poster_path, 'w92') || 'https://placehold.co/80x45/16162a/444?text=?'}"
+            alt="" onerror="this.src='https://placehold.co/80x45/16162a/444?text=?'" />
+          <div class="ep-info">
+            <div class="ep-title">${code}${title}</div>
+            <div class="ep-meta">
+              ${ep.file_path ? '<span class="badge-file-ok">✓ Archivo</span>' : '<span class="badge-file-warn">Sin archivo</span>'}
+              ${hasMeta ? '<span class="badge-meta-ok">✓ Metadata</span>' : '<span class="badge-meta-warn">⚠ Sin metadata</span>'}
+            </div>
+          </div>
+          <button class="btn-icon" title="Editar episodio" onclick="openEdit(${ep.id})">✏️</button>
+        </div>`;
+    }).join('');
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+async function refreshSeriesMeta(idx) {
+  const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
+  if (!seriesEl) return;
+  const seriesKey = seriesEl.dataset.seriesKey;
+  const btns = seriesEl.querySelectorAll('.btn-icon');
+  const btn = btns[1];
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    await apiFetch(`/series/${encodeURIComponent(seriesKey)}/refresh-metadata`, { method: 'POST' });
+    showToast('✓ Metadata de serie actualizada');
+    loadLibrary(...getLibFilters());
+  } catch (err) {
+    showToast('Error: ' + escHtml(err.message));
+    if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
+  }
 }
 
 // ── TMDB SEARCH ──

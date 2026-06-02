@@ -609,3 +609,93 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 
 .metadata-admin-box { margin: 16px 0; padding: 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(255,255,255,.03); }
 .metadata-admin-box .tmdb-results { margin-top: 12px; }
+
+/* ── SERIES ROW ── */
+.media-series {
+  border-left: 2px solid rgba(139,92,246,0.4);
+  border-radius: 10px 10px 10px 10px;
+}
+.media-series + .series-episodes-panel[style*="block"] ~ .media-item,
+.media-series:has(+ .series-episodes-panel[style*="block"]) {
+  border-radius: 10px 10px 0 0;
+}
+
+/* ── EPISODES PANEL ── */
+.series-episodes-panel {
+  margin: -2px 0 6px;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+
+.episodes-container { padding: 6px 14px 12px; }
+
+.season-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 10px 0 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.episode-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  transition: background 0.15s;
+}
+.episode-item:hover { background: rgba(255,255,255,0.04); }
+
+.ep-thumb {
+  width: 80px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: 5px;
+  background: var(--surface3);
+  flex-shrink: 0;
+}
+
+.ep-info { flex: 1; min-width: 0; }
+
+.ep-title {
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ep-code {
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(229,9,20,0.2);
+  color: var(--red);
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.ep-meta {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 3px;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── METADATA BADGES ── */
+.badge-meta-ok   { color: #6fcf97; }
+.badge-meta-warn { color: #f2994a; }
+.badge-file-ok   { color: #6fcf97; }
+.badge-file-warn { color: #ff8080; }

@@ -6,7 +6,7 @@
   <title>LupeFlix — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="admin.css?v=20260602-2" />
+  <link rel="stylesheet" href="admin.css?v=20260602-4" />
 </head>
 <body>
 
@@ -76,6 +76,13 @@
             <option value="">Todos</option>
             <option value="movie">Películas</option>
             <option value="tv">Series</option>
+            <option value="documentary">Documentales</option>
+          </select>
+          <select id="libMeta" class="select-input">
+            <option value="">Metadata: todos</option>
+            <option value="with_meta">Con metadata</option>
+            <option value="no_meta">Sin metadata</option>
+            <option value="no_file">Sin archivo</option>
           </select>
           <button id="rematchAllBtn" class="btn-primary" style="white-space:nowrap" title="Vuelve a descargar metadata de TMDB en español para todos los títulos">
             🔄 Actualizar a Castellano
@@ -298,7 +305,7 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="admin.js?v=20260602-3"></script>
+<script src="admin.js?v=20260602-5"></script>
 </body>
 </html>
 
