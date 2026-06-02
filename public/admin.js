@@ -139,6 +139,8 @@ document.getElementById('libType').addEventListener('change', () =>
   loadLibrary(document.getElementById('libSearch').value, document.getElementById('libType').value)
 );
 
+function escHtml(v) { return String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch])); }
+
 function renderMediaList(id, items) {
   const el = document.getElementById(id);
   if (!items?.length) { el.innerHTML = '<p class="muted" style="padding:12px 0">Sin títulos aún.</p>'; return; }
@@ -250,15 +252,70 @@ window.setFilePath = (p) => {
 };
 
 // ── EDIT MODAL ──
-async function openEdit(id) {
+let currentEditMovie = null;
+async function openEdit(id, openMatcher = false) {
   try {
     const m = await apiFetch(`/movies/${id}`);
+    currentEditMovie = m;
     const form = document.getElementById('editForm');
     Object.keys(m).forEach(k => { if (form.elements[k]) form.elements[k].value = m[k] ?? ''; });
     document.getElementById('deleteBtn').onclick = () => deleteMovie(id, m.title);
     document.getElementById('editOverlay').style.display = 'flex';
+    document.getElementById('editMatchBox').style.display = openMatcher ? 'block' : 'none';
+    document.getElementById('editMatchQuery').value = m.title || '';
+    document.getElementById('editMatchType').value = m.type === 'tv' ? 'tv' : 'movie';
+    document.getElementById('editMatchResults').innerHTML = '';
+    if (openMatcher) searchEditMatches();
   } catch { showToast('Error al cargar'); }
 }
+
+document.getElementById('editIdentifyBtn').addEventListener('click', () => {
+  if (!currentEditMovie) return;
+  document.getElementById('editMatchBox').style.display = 'block';
+  document.getElementById('editMatchQuery').value = currentEditMovie.title || '';
+  document.getElementById('editMatchType').value = currentEditMovie.type === 'tv' ? 'tv' : 'movie';
+  searchEditMatches();
+});
+document.getElementById('editMatchSearch').addEventListener('click', searchEditMatches);
+document.getElementById('editMatchQuery').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); searchEditMatches(); } });
+
+async function searchEditMatches() {
+  if (!currentEditMovie) return;
+  const q = document.getElementById('editMatchQuery').value.trim();
+  const type = document.getElementById('editMatchType').value;
+  const el = document.getElementById('editMatchResults');
+  if (!q) return;
+  el.innerHTML = '<p class="muted">Buscando...</p>';
+  try {
+    const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json());
+    if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el t?tulo original.</p>'; return; }
+    el.innerHTML = data.results.slice(0, 12).map(item => {
+      const title = item.title || item.name || '';
+      const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+      const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : `https://placehold.co/130x195/16162a/444?text=${encodeURIComponent(title || '?')}`;
+      return `<div class="tmdb-card" onclick="applyEditMatch(${item.id}, '${type}')"><img src="${poster}" alt="${escHtml(title)}" /><div class="tmdb-card-title">${escHtml(title)}</div><div class="tmdb-card-year">${year}</div></div>`;
+    }).join('');
+  } catch { el.innerHTML = '<p class="muted">Error buscando en TMDB.</p>'; }
+}
+
+async function applyEditMatch(tmdbId, type) {
+  if (!currentEditMovie) return;
+  const el = document.getElementById('editMatchResults');
+  el.innerHTML = '<p class="muted">Aplicando metadatos...</p>';
+  try {
+    await apiFetch(`/rematch/${currentEditMovie.id}/identify`, {
+      method: 'POST',
+      body: JSON.stringify({ tmdb_id: Number(tmdbId), type }),
+    });
+    showToast('Metadatos actualizados');
+    await openEdit(currentEditMovie.id, false);
+    loadDashboard();
+    loadLibrary();
+  } catch (err) {
+    el.innerHTML = `<p class="muted">${escHtml(err.message)}</p>`;
+  }
+}
+
 document.getElementById('editClose').addEventListener('click', () => { document.getElementById('editOverlay').style.display = 'none'; });
 document.getElementById('editForm').addEventListener('submit', async e => {
   e.preventDefault();

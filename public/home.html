@@ -141,6 +141,7 @@
           <button class="icon-btn" id="detailLater" aria-label="Ver después">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="detailLaterIcon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </button>
+          <button class="btn-trailer" id="detailIdentify" style="display:none">Identificar metadatos</button>
         </div>
       </div>
       <div class="detail-right" id="detailMeta"></div>
@@ -158,6 +159,10 @@
     <div class="detail-extra" id="similarWrap" style="display:none">
       <h3 class="extra-title">Títulos similares</h3>
       <div class="similar-row" id="similarRow"></div>
+    </div>
+    <div class="detail-extra" id="providersWrap" style="display:none">
+      <h3 class="extra-title">D?nde ver fuera de tu servidor</h3>
+      <div class="providers-row" id="providersRow"></div>
     </div>
   </div>
 </div>
@@ -183,6 +188,23 @@
   </div>
 </div>
 
+<!-- METADATA MATCH MODAL -->
+<div class="overlay" id="metadataOverlay">
+  <div class="metadata-modal">
+    <button class="overlay-close" id="metadataClose">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h2>Identificar metadatos</h2>
+    <p class="metadata-help">Busca el t?tulo correcto en TMDB y pulsa sobre el resultado para aplicarlo.</p>
+    <div class="metadata-search-row">
+      <input id="metadataQuery" type="text" placeholder="T?tulo a buscar" />
+      <select id="metadataType"><option value="movie">Pel?cula</option><option value="tv">Serie</option></select>
+      <button id="metadataSearchBtn">Buscar</button>
+    </div>
+    <div id="metadataResults" class="metadata-results"></div>
+  </div>
+</div>
+
 <!-- VIDEO PLAYER -->
 <div id="player" style="display:none">
   <div class="player-bar">
@@ -204,6 +226,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="app.js?v=20260602-2"></script>
+<script src="app.js?v=20260602-3"></script>
 </body>
 </html>

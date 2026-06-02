@@ -12,12 +12,15 @@ document.getElementById('userName').textContent = session.name;
 const av = document.getElementById('userAvatar');
 if (session.picture) { av.style.cssText = `background:url(${session.picture}) center/cover;`; }
 else av.textContent = session.name[0].toUpperCase();
+let isAdminUser = false;
 
 (async () => {
   const r = await fetch('/api/admin/check', { headers: { 'x-user-email': session.email } }).catch(() => ({ json: () => ({}) }));
   const d = await r.json().catch(() => ({}));
-  if (d.allowed && localStorage.getItem('lupeflix_admin'))
+  if (d.allowed) {
+    isAdminUser = true;
     document.getElementById('adminLink').style.display = 'flex';
+  }
 })();
 
 document.getElementById('logoutBtn').addEventListener('click', async e => {
@@ -467,6 +470,12 @@ async function showDetail(id) {
       laterBtn.classList.toggle('later-active', on);
     };
 
+    const identifyBtn = document.getElementById('detailIdentify');
+    if (identifyBtn) {
+      identifyBtn.style.display = isAdminUser ? 'flex' : 'none';
+      identifyBtn.onclick = () => openMetadataMatch(id, m.title, m.type);
+    }
+
     // Trailer
     currentTrailer = extras.trailer || null;
     const trailerBtn = document.getElementById('trailerBtn');
@@ -525,21 +534,28 @@ function renderProviders(providers) {
       </a>`).join('')}</div>`).join('');
 }
 
+function setElText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
+function setElHtml(id, value) { const el = document.getElementById(id); if (el) el.innerHTML = value; }
+function setElDisplay(id, value) { const el = document.getElementById(id); if (el) el.style.display = value; }
+function clearElBg(id) { const el = document.getElementById(id); if (el) el.style.backgroundImage = ''; }
+
 function resetDetail() {
-  document.getElementById('detailBackdrop').style.backgroundImage = '';
-  document.getElementById('detailEyebrow').textContent = 'Cargando...';
-  document.getElementById('detailTitle').textContent   = '';
-  document.getElementById('detailRating').innerHTML    = '';
-  document.getElementById('detailDesc').textContent    = '';
-  document.getElementById('detailMeta').innerHTML      = '';
-  document.getElementById('trailerWrap').style.display = 'none';
-  document.getElementById('trailerFrame').src          = '';
-  document.getElementById('castWrap').style.display    = 'none';
-  document.getElementById('similarWrap').style.display = 'none';
-  document.getElementById('providersWrap').style.display = 'none';
-  document.getElementById('castRow').innerHTML    = '';
-  document.getElementById('similarRow').innerHTML = '';
-  document.getElementById('providersRow').innerHTML = '';
+  clearElBg('detailBackdrop');
+  setElText('detailEyebrow', 'Cargando...');
+  setElText('detailTitle', '');
+  setElHtml('detailRating', '');
+  setElText('detailDesc', '');
+  setElHtml('detailMeta', '');
+  setElDisplay('trailerWrap', 'none');
+  const trailerFrame = document.getElementById('trailerFrame');
+  if (trailerFrame) trailerFrame.src = '';
+  setElDisplay('castWrap', 'none');
+  setElDisplay('similarWrap', 'none');
+  setElDisplay('providersWrap', 'none');
+  setElDisplay('detailIdentify', 'none');
+  setElHtml('castRow', '');
+  setElHtml('similarRow', '');
+  setElHtml('providersRow', '');
   currentTrailer = null;
 }
 
@@ -630,6 +646,53 @@ async function showSeriesModal(key) {
 
 /* ── OVERLAYS ── */
 
+
+let metadataTarget = null;
+async function openMetadataMatch(id, title, type = 'movie') {
+  metadataTarget = { id, title, type: type === 'tv' ? 'tv' : 'movie' };
+  openOverlay('metadataOverlay');
+  const q = document.getElementById('metadataQuery');
+  const t = document.getElementById('metadataType');
+  const results = document.getElementById('metadataResults');
+  if (q) q.value = title || '';
+  if (t) t.value = metadataTarget.type;
+  if (results) results.innerHTML = '';
+  await searchMetadataMatches();
+}
+async function searchMetadataMatches() {
+  if (!metadataTarget) return;
+  const q = document.getElementById('metadataQuery')?.value.trim();
+  const type = document.getElementById('metadataType')?.value || metadataTarget.type;
+  const results = document.getElementById('metadataResults');
+  if (!q || !results) return;
+  results.innerHTML = '<p class="metadata-help">Buscando...</p>';
+  try {
+    const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json());
+    if (!data.results?.length) { results.innerHTML = '<p class="metadata-help">Sin resultados. Prueba con el t?tulo original.</p>'; return; }
+    results.innerHTML = data.results.slice(0, 12).map(item => {
+      const title = item.title || item.name || '';
+      const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+      const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : `https://placehold.co/90x135/222/555?text=${encodeURIComponent(title || '?')}`;
+      return `<button class="metadata-card" data-tmdb="${item.id}" data-type="${type}"><img src="${poster}" /><span><strong>${escHtml(title)}</strong><small>${year || 'Sin a?o'} ? ${Number(item.vote_average || 0).toFixed(1)}/10</small></span></button>`;
+    }).join('');
+    results.querySelectorAll('.metadata-card').forEach(btn => btn.addEventListener('click', () => applyMetadataMatch(btn.dataset.tmdb, btn.dataset.type)));
+  } catch (e) { console.error(e); results.innerHTML = '<p class="metadata-help">Error buscando en TMDB.</p>'; }
+}
+async function applyMetadataMatch(tmdbId, type) {
+  if (!metadataTarget) return;
+  const results = document.getElementById('metadataResults');
+  if (results) results.innerHTML = '<p class="metadata-help">Aplicando metadatos...</p>';
+  try {
+    await fetch(`/api/rematch/${metadataTarget.id}/identify`, {
+      method: 'POST',
+      headers: auth(),
+      body: JSON.stringify({ tmdb_id: Number(tmdbId), type }),
+    }).then(async r => { if (!r.ok) throw new Error((await r.json()).error || 'Error identificando'); return r.json(); });
+    closeOverlay('metadataOverlay');
+    showToast('Metadatos actualizados');
+    showDetail(metadataTarget.id);
+  } catch (e) { console.error(e); if (results) results.innerHTML = `<p class="metadata-help">${escHtml(e.message)}</p>`; }
+}
 async function showPerson(personId) {
   openOverlay('personOverlay');
   document.getElementById('personName').textContent = 'Cargando...';
@@ -665,10 +728,14 @@ function closeOverlay(id) { document.getElementById(id)?.classList.remove('open'
 document.getElementById('detailClose')?.addEventListener('click', () => closeOverlay('detailOverlay'));
 document.getElementById('seriesClose')?.addEventListener('click', () => closeOverlay('seriesOverlay'));
 document.getElementById('personClose')?.addEventListener('click', () => closeOverlay('personOverlay'));
+document.getElementById('metadataClose')?.addEventListener('click', () => closeOverlay('metadataOverlay'));
+document.getElementById('metadataSearchBtn')?.addEventListener('click', searchMetadataMatches);
+document.getElementById('metadataQuery')?.addEventListener('keydown', e => { if (e.key === 'Enter') searchMetadataMatches(); });
 document.getElementById('detailOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('detailOverlay'); });
 document.getElementById('seriesOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('seriesOverlay'); });
 document.getElementById('personOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('personOverlay'); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeOverlay('detailOverlay'); closeOverlay('seriesOverlay'); closeOverlay('personOverlay'); closePlayer(); } });
+document.getElementById('metadataOverlay')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeOverlay('metadataOverlay'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeOverlay('detailOverlay'); closeOverlay('seriesOverlay'); closeOverlay('personOverlay'); closeOverlay('metadataOverlay'); closePlayer(); } });
 
 /* ── PLAYER ── */
 let progressInterval, playerUiInterval, currentPlaybackId = null, currentNextEpisode = null;

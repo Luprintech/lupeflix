@@ -606,3 +606,6 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
   pointer-events: none;
 }
 .toast.show { transform: translateY(0); opacity: 1; }
+
+.metadata-admin-box { margin: 16px 0; padding: 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(255,255,255,.03); }
+.metadata-admin-box .tmdb-results { margin-top: 12px; }

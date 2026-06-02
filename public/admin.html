@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LupeFlix — Admin</title>
+  <title>LupeFlix â€” Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="admin.css?v=20260602" />
@@ -48,7 +48,7 @@
         Escanear NAS
       </a>
     </nav>
-    <a href="home.html" class="sidebar-back">← Volver a LupeFlix</a>
+    <a href="home.html" class="sidebar-back">â† Volver a LupeFlix</a>
   </aside>
 
   <main class="admin-main">
@@ -57,10 +57,10 @@
     <section id="sec-dashboard" class="admin-section active">
       <h1 class="section-heading">Dashboard</h1>
       <div class="stats-grid" id="statsGrid">
-        <div class="stat-card"><div class="stat-num" id="statTotal">–</div><div class="stat-label">Títulos totales</div></div>
-        <div class="stat-card"><div class="stat-num" id="statMovies">–</div><div class="stat-label">Películas</div></div>
-        <div class="stat-card"><div class="stat-num" id="statSeries">–</div><div class="stat-label">Series</div></div>
-        <div class="stat-card"><div class="stat-num" id="statViews">–</div><div class="stat-label">Reproducciones</div></div>
+        <div class="stat-card"><div class="stat-num" id="statTotal">â€“</div><div class="stat-label">TÃ­tulos totales</div></div>
+        <div class="stat-card"><div class="stat-num" id="statMovies">â€“</div><div class="stat-label">PelÃ­culas</div></div>
+        <div class="stat-card"><div class="stat-num" id="statSeries">â€“</div><div class="stat-label">Series</div></div>
+        <div class="stat-card"><div class="stat-num" id="statViews">â€“</div><div class="stat-label">Reproducciones</div></div>
       </div>
       <h2 class="sub-heading">Agregados recientemente</h2>
       <div id="recentList" class="media-list"></div>
@@ -74,11 +74,11 @@
           <input type="text" id="libSearch" placeholder="Buscar..." class="search-input" />
           <select id="libType" class="select-input">
             <option value="">Todos</option>
-            <option value="movie">Películas</option>
+            <option value="movie">PelÃ­culas</option>
             <option value="tv">Series</option>
           </select>
-          <button id="rematchAllBtn" class="btn-primary" style="white-space:nowrap" title="Vuelve a descargar metadata de TMDB en español para todos los títulos">
-            🔄 Actualizar a Castellano
+          <button id="rematchAllBtn" class="btn-primary" style="white-space:nowrap" title="Vuelve a descargar metadata de TMDB en espaÃ±ol para todos los tÃ­tulos">
+            ðŸ”„ Actualizar a Castellano
           </button>
         </div>
       </div>
@@ -97,9 +97,9 @@
       <div class="card-panel">
         <h2 class="panel-title">Buscar en TMDB</h2>
         <div class="tmdb-search-row">
-          <input type="text" id="tmdbQuery" placeholder="Nombre de la película o serie..." class="search-input" />
+          <input type="text" id="tmdbQuery" placeholder="Nombre de la pelÃ­cula o serie..." class="search-input" />
           <select id="tmdbType" class="select-input" style="width:140px">
-            <option value="movie">Película</option>
+            <option value="movie">PelÃ­cula</option>
             <option value="tv">Serie</option>
           </select>
           <button id="tmdbSearchBtn" class="btn-primary">Buscar</button>
@@ -108,39 +108,39 @@
       </div>
 
       <div class="card-panel" id="manualForm" style="display:none">
-        <h2 class="panel-title">Información del título <button id="clearForm" class="btn-ghost btn-sm">✕ Limpiar</button></h2>
+        <h2 class="panel-title">InformaciÃ³n del tÃ­tulo <button id="clearForm" class="btn-ghost btn-sm">âœ• Limpiar</button></h2>
         <form id="addForm">
           <div class="form-grid">
             <div class="form-group">
-              <label>Título *</label>
+              <label>TÃ­tulo *</label>
               <input type="text" name="title" required />
             </div>
             <div class="form-group">
-              <label>Título Original</label>
+              <label>TÃ­tulo Original</label>
               <input type="text" name="original_title" />
             </div>
             <div class="form-group">
-              <label>Año</label>
+              <label>AÃ±o</label>
               <input type="number" name="year" min="1900" max="2099" />
             </div>
             <div class="form-group">
               <label>Tipo</label>
               <select name="type">
-                <option value="movie">Película</option>
+                <option value="movie">PelÃ­cula</option>
                 <option value="tv">Serie</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Calificación (0-10)</label>
+              <label>CalificaciÃ³n (0-10)</label>
               <input type="number" name="rating" min="0" max="10" step="0.1" />
             </div>
             <div class="form-group">
-              <label>Duración (minutos)</label>
+              <label>DuraciÃ³n (minutos)</label>
               <input type="number" name="duration" />
             </div>
             <div class="form-group">
-              <label>Géneros</label>
-              <input type="text" name="genres" placeholder="Acción, Drama, ..." />
+              <label>GÃ©neros</label>
+              <input type="text" name="genres" placeholder="AcciÃ³n, Drama, ..." />
             </div>
             <div class="form-group">
               <label>Director</label>
@@ -151,7 +151,7 @@
               <input type="text" name="cast" placeholder="Actor 1, Actor 2, ..." />
             </div>
             <div class="form-group span2">
-              <label>Descripción</label>
+              <label>DescripciÃ³n</label>
               <textarea name="description" rows="3"></textarea>
             </div>
             <div class="form-group">
@@ -180,7 +180,7 @@
           <div id="addSuccess" class="success-msg" style="display:none"></div>
 
           <div class="form-actions">
-            <button type="submit" class="btn-primary">💾 Guardar en Biblioteca</button>
+            <button type="submit" class="btn-primary">ðŸ’¾ Guardar en Biblioteca</button>
           </div>
         </form>
       </div>
@@ -196,9 +196,9 @@
           <input type="text" id="uploadFolder" value="uploads" class="search-input" placeholder="movies/Titulo" />
         </div>
         <div class="drop-zone" id="dropZone">
-          <div class="drop-icon">📁</div>
-          <p>Arrastrá tu archivo de video aquí</p>
-          <p class="drop-sub">o hacé click para seleccionar</p>
+          <div class="drop-icon">ðŸ“</div>
+          <p>ArrastrÃ¡ tu archivo de video aquÃ­</p>
+          <p class="drop-sub">o hacÃ© click para seleccionar</p>
           <input type="file" id="fileInput" accept="video/*" style="display:none" />
         </div>
         <div id="uploadProgress" style="display:none">
@@ -221,20 +221,20 @@
         <h2 class="panel-title">Detectar archivos de video</h2>
         <p class="muted">Escanea la carpeta <strong>/media</strong> del contenedor Docker y lista todos los archivos de video encontrados.</p>
         <div class="form-group" style="margin-top:16px">
-          <label>Filtrar por directorio (opcional — dejá vacío para escanear todo)</label>
+          <label>Filtrar por directorio (opcional â€” dejÃ¡ vacÃ­o para escanear todo)</label>
           <select id="scanFolder" class="select-input" style="width:100%">
             <option value="">Todos los directorios</option>
-            <option value="/media/Películas">🎬 Películas (vol1)</option>
-            <option value="/media/Películas2">🎬 Películas 2 (vol2)</option>
-            <option value="/media/PeliculasAnimacion">🎬 Películas Animación (vol2)</option>
-            <option value="/media/Series">📺 Series (vol2)</option>
-            <option value="/media/SeriesAnimacion">📺 Series Animación (vol2)</option>
+            <option value="/media/PelÃ­culas">ðŸŽ¬ PelÃ­culas (vol1)</option>
+            <option value="/media/PelÃ­culas2">ðŸŽ¬ PelÃ­culas 2 (vol2)</option>
+            <option value="/media/PeliculasAnimacion">ðŸŽ¬ PelÃ­culas AnimaciÃ³n (vol2)</option>
+            <option value="/media/Series">ðŸ“º Series (vol2)</option>
+            <option value="/media/SeriesAnimacion">ðŸ“º Series AnimaciÃ³n (vol2)</option>
           </select>
         </div>
         <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
-          <button id="scanBtn" class="btn-primary">🔍 Escanear</button>
-          <button id="addAllBtn" class="btn-primary" style="display:none;background:#1a472a;border:1px solid #27ae60">⚡ Agregar todos automáticamente</button>
-          <button id="addAllStopBtn" class="btn-danger" style="display:none">⏹ Detener</button>
+          <button id="scanBtn" class="btn-primary">ðŸ” Escanear</button>
+          <button id="addAllBtn" class="btn-primary" style="display:none;background:#1a472a;border:1px solid #27ae60">âš¡ Agregar todos automÃ¡ticamente</button>
+          <button id="addAllStopBtn" class="btn-danger" style="display:none">â¹ Detener</button>
         </div>
         <div id="addAllProgress" style="display:none;margin-top:16px">
           <div class="progress-info">
@@ -255,31 +255,41 @@
 <div class="modal-overlay" id="editOverlay" style="display:none">
   <div class="edit-modal">
     <div class="edit-modal-header">
-      <h2>Editar Título</h2>
-      <button id="editClose">✕</button>
+      <h2>Editar TÃ­tulo</h2>
+      <button id="editClose">âœ•</button>
     </div>
     <form id="editForm">
       <input type="hidden" name="id" />
       <div class="form-grid">
-        <div class="form-group"><label>Título</label><input type="text" name="title" required /></div>
-        <div class="form-group"><label>Año</label><input type="number" name="year" /></div>
+        <div class="form-group"><label>TÃ­tulo</label><input type="text" name="title" required /></div>
+        <div class="form-group"><label>AÃ±o</label><input type="number" name="year" /></div>
         <div class="form-group"><label>Tipo</label>
-          <select name="type"><option value="movie">Película</option><option value="tv">Serie</option></select>
+          <select name="type"><option value="movie">PelÃ­cula</option><option value="tv">Serie</option></select>
         </div>
         <div class="form-group"><label>Rating</label><input type="number" name="rating" step="0.1" /></div>
-        <div class="form-group"><label>Duración (min)</label><input type="number" name="duration" /></div>
-        <div class="form-group"><label>Géneros</label><input type="text" name="genres" /></div>
+        <div class="form-group"><label>DuraciÃ³n (min)</label><input type="number" name="duration" /></div>
+        <div class="form-group"><label>GÃ©neros</label><input type="text" name="genres" /></div>
         <div class="form-group"><label>Director</label><input type="text" name="director" /></div>
         <div class="form-group span2"><label>Reparto</label><input type="text" name="cast" /></div>
-        <div class="form-group span2"><label>Descripción</label><textarea name="description" rows="3"></textarea></div>
+        <div class="form-group span2"><label>DescripciÃ³n</label><textarea name="description" rows="3"></textarea></div>
         <div class="form-group"><label>Poster Path</label><input type="text" name="poster_path" /></div>
         <div class="form-group"><label>Backdrop Path</label><input type="text" name="backdrop_path" /></div>
+        <div class="form-group"><label>TMDB ID</label><input type="number" name="tmdb_id" /></div>
         <div class="form-group span2"><label>Ruta del archivo</label><input type="text" name="file_path" /></div>
+      </div>
+      <div id="editMatchBox" class="metadata-admin-box" style="display:none">
+        <div class="tmdb-search-row">
+          <input type="text" id="editMatchQuery" class="search-input" placeholder="Buscar t?tulo en TMDB" />
+          <select id="editMatchType" class="select-input" style="width:120px"><option value="movie">Pel?cula</option><option value="tv">Serie</option></select>
+          <button type="button" id="editMatchSearch" class="btn-primary">Buscar</button>
+        </div>
+        <div id="editMatchResults" class="tmdb-results"></div>
       </div>
       <div id="editError" class="error-msg" style="display:none"></div>
       <div class="form-actions">
-        <button type="submit" class="btn-primary">💾 Guardar cambios</button>
-        <button type="button" id="deleteBtn" class="btn-danger">🗑 Eliminar</button>
+        <button type="button" id="editIdentifyBtn" class="btn-primary">Identificar metadatos</button>
+        <button type="submit" class="btn-primary">ðŸ’¾ Guardar cambios</button>
+        <button type="button" id="deleteBtn" class="btn-danger">ðŸ—‘ Eliminar</button>
       </div>
     </form>
   </div>
@@ -288,6 +298,7 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="admin.js?v=20260602"></script>
+<script src="admin.js?v=20260602-2"></script>
 </body>
 </html>
+
