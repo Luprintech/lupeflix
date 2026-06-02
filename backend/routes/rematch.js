@@ -87,6 +87,70 @@ async function applyMetadata(movie, tmdbId, mediaType, saveType = null) {
   return { title, year, poster: posterPath, type: libraryType, tmdb_media_type: lookupType, tmdb_id: Number(tmdbId) };
 }
 
+// ── AUTO-SEARCH HELPERS ──
+function cleanTitleForSearch(raw) {
+  return String(raw || '')
+    .replace(/\s*[–—-]\s*(?:T\d+E\d+|S\d+E\d+|Temporada|Season).*/i, '')
+    .replace(/\b(?:BluRay|BDRip|WEB[-.]?DL|WEBRip|HDRip|DVDRip|1080p|720p|2160p|4K|x264|x265|HEVC|REMUX|PROPER|REPACK)\b.*/i, '')
+    .replace(/\((?:19|20)\d{2}\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function titleCandidates(raw) {
+  const base = cleanTitleForSearch(raw);
+  const results = [base];
+  const noArticle = base.replace(/^(?:El|La|Los|Las|The|Un|Una)\s+/i, '').trim();
+  if (noArticle !== base) results.push(noArticle);
+  const noSub = base.replace(/\s*[:–—].*/g, '').trim();
+  if (noSub !== base && noSub.length > 2) results.push(noSub);
+  return [...new Set(results)].filter(t => t.length > 1);
+}
+
+async function autoFindOnTmdb(movie) {
+  const mediaType = movie.type === 'tv' ? 'tv' : 'movie';
+  const endpoint  = `/search/${mediaType}`;
+  for (const q of titleCandidates(movie.title || movie.original_title || '')) {
+    for (const year of movie.year ? [movie.year, null] : [null]) {
+      try {
+        const params = { query: q };
+        if (year) params.year = year;
+        const data = await tmdb(endpoint, 'es-ES', params);
+        const r = (data.results || [])[0];
+        if (r) return { tmdbId: r.id, mediaType };
+      } catch {}
+    }
+  }
+  return null;
+}
+
+// POST /api/rematch/ids-missing — IDs without metadata (movies/docs only)
+router.post('/ids-missing', requireAdmin, (req, res) => {
+  const { type, limit = 500 } = req.body || {};
+  let query  = "SELECT id FROM movies WHERE type != 'tv' AND (tmdb_id IS NULL OR tmdb_id = 0)";
+  const params = [];
+  if (type && type !== 'tv') { query += ' AND type = ?'; params.push(type); }
+  query += ' ORDER BY added_at DESC LIMIT ?';
+  params.push(Number(limit));
+  const ids = db.prepare(query).all(...params).map(r => r.id);
+  res.json({ ok: true, count: ids.length, ids });
+});
+
+// POST /api/rematch/:id/auto — auto-find TMDB and apply metadata for items without it
+router.post('/:id/auto', requireAdmin, async (req, res) => {
+  const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
+  if (!movie) return res.status(404).json({ error: 'Not found' });
+  if (movie.tmdb_id) return res.json({ ok: true, skipped: true, title: movie.title });
+  try {
+    const found = await autoFindOnTmdb(movie);
+    if (!found) return res.json({ ok: false, not_found: true, title: movie.title });
+    const result = await applyMetadata(movie, found.tmdbId, found.mediaType, movie.type);
+    res.json({ ok: true, source: 'auto', ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/rematch/:id/identify ? set TMDB ID manually and refresh metadata.
 router.post('/:id/identify', requireAdmin, async (req, res) => {
   const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);

@@ -6,7 +6,7 @@
   <title>LupeFlix — Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="admin.css?v=20260602-4" />
+  <link rel="stylesheet" href="admin.css?v=20260602-6" />
 </head>
 <body>
 
@@ -84,15 +84,15 @@
             <option value="no_meta">Sin metadata</option>
             <option value="no_file">Sin archivo</option>
           </select>
-          <button id="rematchAllBtn" class="btn-primary" style="white-space:nowrap" title="Vuelve a descargar metadata de TMDB en español para todos los títulos">
-            🔄 Actualizar a Castellano
+          <button id="autoFillBtn" class="btn-primary" style="white-space:nowrap" title="Busca y aplica metadata automáticamente a todos los títulos que no tienen aún">
+            ⬇ Llenar metadatos faltantes
           </button>
         </div>
       </div>
-      <div id="rematchProgress" style="display:none;margin-bottom:16px">
-        <div class="progress-info"><span id="rematchStatus"></span><span id="rematchCount"></span></div>
-        <div class="progress-bar"><div class="progress-fill" id="rematchFill"></div></div>
-        <div id="rematchLog" class="add-all-log"></div>
+      <div id="autoFillProgress" style="display:none;margin-bottom:16px">
+        <div class="progress-info"><span id="autoFillStatus"></span><span id="autoFillCount"></span></div>
+        <div class="progress-bar"><div class="progress-fill" id="autoFillBar"></div></div>
+        <div id="autoFillLog" class="add-all-log"></div>
       </div>
       <div id="libraryList" class="media-list"></div>
     </section>
@@ -287,7 +287,7 @@
       <div id="editMatchBox" class="metadata-admin-box" style="display:none">
         <div class="tmdb-search-row">
           <input type="text" id="editMatchQuery" class="search-input" placeholder="Buscar t?tulo en TMDB" />
-          <select id="editMatchType" class="select-input" style="width:120px"><option value="movie">Pel?cula</option><option value="tv">Serie</option></select>
+          <select id="editMatchType" class="select-input" style="width:140px"><option value="movie">Película</option><option value="tv">Serie</option><option value="documentary">Documental</option></select>
           <button type="button" id="editMatchSearch" class="btn-primary">Buscar</button>
         </div>
         <div id="editMatchResults" class="tmdb-results"></div>
@@ -295,6 +295,7 @@
       <div id="editError" class="error-msg" style="display:none"></div>
       <div class="form-actions">
         <button type="button" id="editIdentifyBtn" class="btn-primary">Identificar metadatos</button>
+        <button type="button" id="editRematchBtn" class="btn-ghost" title="Re-descarga metadata desde TMDB en español (requiere TMDB ID)">🌐 Actualizar a Castellano</button>
         <button type="submit" class="btn-primary">💾 Guardar cambios</button>
         <button type="button" id="deleteBtn" class="btn-danger">🗑 Eliminar</button>
       </div>
@@ -305,7 +306,7 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="admin.js?v=20260602-5"></script>
+<script src="admin.js?v=20260602-6"></script>
 </body>
 </html>
 

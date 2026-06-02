@@ -436,7 +436,7 @@ async function openEdit(id, openMatcher = false) {
     document.getElementById('editOverlay').style.display = 'flex';
     document.getElementById('editMatchBox').style.display = openMatcher ? 'block' : 'none';
     document.getElementById('editMatchQuery').value = m.title || '';
-    document.getElementById('editMatchType').value = m.type === 'tv' ? 'tv' : 'movie';
+    document.getElementById('editMatchType').value = m.type === 'tv' ? 'tv' : m.type === 'documentary' ? 'documentary' : 'movie';
     document.getElementById('editMatchResults').innerHTML = '';
     if (openMatcher) searchEditMatches();
   } catch { showToast('Error al cargar'); }
@@ -446,7 +446,7 @@ document.getElementById('editIdentifyBtn').addEventListener('click', () => {
   if (!currentEditMovie) return;
   document.getElementById('editMatchBox').style.display = 'block';
   document.getElementById('editMatchQuery').value = currentEditMovie.title || '';
-  document.getElementById('editMatchType').value = currentEditMovie.type === 'tv' ? 'tv' : 'movie';
+  document.getElementById('editMatchType').value = currentEditMovie.type === 'tv' ? 'tv' : currentEditMovie.type === 'documentary' ? 'documentary' : 'movie';
   searchEditMatches();
 });
 document.getElementById('editMatchSearch').addEventListener('click', searchEditMatches);
@@ -454,17 +454,18 @@ document.getElementById('editMatchQuery').addEventListener('keydown', e => { if 
 
 async function searchEditMatches() {
   if (!currentEditMovie) return;
-  const q = document.getElementById('editMatchQuery').value.trim();
+  const q    = document.getElementById('editMatchQuery').value.trim();
   const type = document.getElementById('editMatchType').value;
-  const el = document.getElementById('editMatchResults');
+  const tmdbType = type === 'documentary' ? 'movie' : type;
+  const el   = document.getElementById('editMatchResults');
   if (!q) return;
   el.innerHTML = '<p class="muted">Buscando...</p>';
   try {
-    const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${type}`).then(r => r.json());
+    const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=${tmdbType}`).then(r => r.json());
     if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el título original.</p>'; return; }
     el.innerHTML = data.results.slice(0, 12).map(item => {
-      const title = item.title || item.name || '';
-      const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+      const title  = item.title || item.name || '';
+      const year   = (item.release_date || item.first_air_date || '').slice(0, 4);
       const poster = item.poster_path ? `https://image.tmdb.org/t/p/w185${item.poster_path}` : `https://placehold.co/130x195/16162a/444?text=${encodeURIComponent(title || '?')}`;
       return `<div class="tmdb-card" onclick="applyEditMatch(${item.id}, '${type}')"><img src="${poster}" alt="${escHtml(title)}" /><div class="tmdb-card-title">${escHtml(title)}</div><div class="tmdb-card-year">${year}</div></div>`;
     }).join('');
@@ -476,10 +477,11 @@ async function applyEditMatch(tmdbId, type) {
   const el = document.getElementById('editMatchResults');
   el.innerHTML = '<p class="muted">Aplicando metadatos...</p>';
   try {
-    await apiFetch(`/rematch/${currentEditMovie.id}/identify`, {
-      method: 'POST',
-      body: JSON.stringify({ tmdb_id: Number(tmdbId), type }),
-    });
+    const tmdbType = type === 'documentary' ? 'movie' : type;
+    const saveType = type === 'documentary' ? 'documentary' : null;
+    const body = { tmdb_id: Number(tmdbId), type: tmdbType };
+    if (saveType) body.save_type = saveType;
+    await apiFetch(`/rematch/${currentEditMovie.id}/identify`, { method: 'POST', body: JSON.stringify(body) });
     showToast('Metadatos actualizados');
     await openEdit(currentEditMovie.id, false);
     loadDashboard();
@@ -490,6 +492,23 @@ async function applyEditMatch(tmdbId, type) {
 }
 
 document.getElementById('editClose').addEventListener('click', () => { document.getElementById('editOverlay').style.display = 'none'; });
+
+document.getElementById('editRematchBtn').addEventListener('click', async () => {
+  if (!currentEditMovie) return;
+  if (!currentEditMovie.tmdb_id) { showToast('Sin TMDB ID — identificá los metadatos primero'); return; }
+  const btn = document.getElementById('editRematchBtn');
+  btn.disabled = true; btn.textContent = '⏳ Actualizando...';
+  try {
+    const res = await apiFetch(`/rematch/${currentEditMovie.id}`, { method: 'POST' });
+    showToast(`✓ "${res.title}" actualizado a castellano`);
+    await openEdit(currentEditMovie.id, false);
+    loadLibrary();
+  } catch (err) {
+    showToast('Error: ' + escHtml(err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = '🌐 Actualizar a Castellano';
+  }
+});
 document.getElementById('editForm').addEventListener('submit', async e => {
   e.preventDefault();
   const id   = e.target.elements['id'].value;
@@ -715,63 +734,92 @@ function addLog(type, msg) {
   log.scrollTop = log.scrollHeight;
 }
 
-// ── REMATCH (actualizar metadata a castellano) ──
-document.getElementById('rematchAllBtn').addEventListener('click', async () => {
-  if (!confirm('Esto re-descarga la metadata de TODOS los títulos desde TMDB en español (es-ES). Puede tardar varios minutos. ¿Continuar?')) return;
+// ── AUTO-FILL MISSING METADATA ──
+let autoFillRunning = false, autoFillStop = false;
 
-  const progEl  = document.getElementById('rematchProgress');
-  const statEl  = document.getElementById('rematchStatus');
-  const cntEl   = document.getElementById('rematchCount');
-  const fillEl  = document.getElementById('rematchFill');
-  const logEl   = document.getElementById('rematchLog');
+document.getElementById('autoFillBtn').addEventListener('click', async () => {
+  if (autoFillRunning) return;
+  const typeFilter = document.getElementById('libType').value;
+  if (typeFilter === 'tv') { showToast('Las series se actualizan con 🔄 en cada fila'); return; }
+  if (!confirm('Buscará y aplicará metadatos automáticamente a todos los títulos que no tienen aún. Puede tardar varios minutos. ¿Continuar?')) return;
+
+  autoFillRunning = true; autoFillStop = false;
+  const progEl = document.getElementById('autoFillProgress');
+  const statEl = document.getElementById('autoFillStatus');
+  const cntEl  = document.getElementById('autoFillCount');
+  const fillEl = document.getElementById('autoFillBar');
+  const logEl  = document.getElementById('autoFillLog');
   progEl.style.display = 'block';
   logEl.innerHTML = '';
+  document.getElementById('autoFillBtn').disabled = true;
 
-  // Get all IDs with TMDB data
-  const type = document.getElementById('libType').value || null;
-  const body = { limit: 2000 };
-  if (type) body.type = type;
+  const body = { limit: 1000 };
+  if (typeFilter && typeFilter !== 'tv') body.type = typeFilter;
 
-  const { ids } = await fetch('/api/rematch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
-    body: JSON.stringify(body),
-  }).then(r => r.json());
+  let ids = [];
+  try {
+    const res = await apiFetch('/rematch/ids-missing', { method: 'POST', body: JSON.stringify(body) });
+    ids = res.ids || [];
+  } catch (err) {
+    statEl.textContent = 'Error obteniendo lista: ' + err.message;
+    autoFillRunning = false;
+    document.getElementById('autoFillBtn').disabled = false;
+    return;
+  }
+
+  if (!ids.length) {
+    statEl.textContent = '✓ No hay títulos sin metadata';
+    cntEl.textContent = '0 / 0';
+    autoFillRunning = false;
+    document.getElementById('autoFillBtn').disabled = false;
+    return;
+  }
 
   const total = ids.length;
-  let done = 0, ok = 0, errors = 0;
+  let done = 0, ok = 0, notFound = 0;
 
   for (const id of ids) {
-    statEl.textContent = `Actualizando ID ${id}...`;
+    if (autoFillStop) break;
     cntEl.textContent  = `${done + 1} / ${total}`;
     fillEl.style.width = `${Math.round((done / total) * 100)}%`;
 
     try {
-      const res = await fetch(`/api/rematch/${id}`, {
-        method: 'POST',
-        headers: { 'x-admin-token': adminToken },
-      }).then(r => r.json());
-
-      if (res.ok) {
+      const res = await apiFetch(`/rematch/${id}/auto`, { method: 'POST' });
+      const item = document.createElement('div');
+      if (res.skipped) {
+        item.className = 'log-item log-skip';
+        item.textContent = `⏭ Ya tenía metadata`;
+      } else if (res.ok) {
         ok++;
-        const item = document.createElement('div');
         item.className = 'log-item log-ok';
-        item.textContent = `✓ ${res.title} (${res.year || '?'})`;
-        logEl.appendChild(item);
-        logEl.scrollTop = logEl.scrollHeight;
+        item.textContent = `✓ ${res.title}${res.year ? ` (${res.year})` : ''}`;
+        statEl.textContent = `Procesando: ${res.title || ''}`;
+      } else {
+        notFound++;
+        item.className = 'log-item log-err';
+        item.textContent = `✗ No encontrado: ${res.title || `ID ${id}`}`;
       }
-    } catch {
-      errors++;
+      logEl.appendChild(item);
+      logEl.scrollTop = logEl.scrollHeight;
+    } catch (err) {
+      notFound++;
+      const item = document.createElement('div');
+      item.className = 'log-item log-err';
+      item.textContent = `✗ ID ${id} — ${err.message}`;
+      logEl.appendChild(item);
     }
+
     done++;
-    await new Promise(r => setTimeout(r, 300)); // TMDB rate limit
+    await new Promise(r => setTimeout(r, 350)); // TMDB rate limit
   }
 
   fillEl.style.width = '100%';
-  statEl.textContent = `Listo: ${ok} actualizados, ${errors} errores`;
+  statEl.textContent = `Listo: ${ok} actualizados, ${notFound} no encontrados`;
   cntEl.textContent  = `${done} / ${total}`;
-  showToast(`✓ ${ok} títulos actualizados a castellano`);
-  loadLibrary();
+  showToast(`✅ ${ok} títulos con nueva metadata`);
+  autoFillRunning = false;
+  document.getElementById('autoFillBtn').disabled = false;
+  loadLibrary(...getLibFilters());
 });
 
 // ── TOAST ──
