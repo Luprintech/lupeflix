@@ -45,7 +45,9 @@ export function escHtml(str?: string | null): string {
  * Used to open the series modal and call /api/series/:key/seasons.
  */
 export function getSeriesKey(m: Movie): string {
-  if (m.series_key) return m.series_key;
+  if (m.series_key) {
+    return m.series_key.replace(/^sid:/, 'id:').replace(/^st:/, 'title:');
+  }
   if (m.series_id != null) return `id:${m.series_id}`;
   if (m.series_title) return `title:${m.series_title.trim().toLowerCase()}`;
   return m.title || '';

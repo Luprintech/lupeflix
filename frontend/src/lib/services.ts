@@ -82,6 +82,16 @@ export function refreshSeriesMetadata(key: string): Promise<{ ok: boolean; serie
   });
 }
 
+export function setSeriesTmdb(
+  key: string,
+  tmdbId: number
+): Promise<{ ok: boolean; series: SeriesDetail }> {
+  return request(`/api/series/${encodeURIComponent(key)}/set-tmdb`, {
+    method: 'POST',
+    body: JSON.stringify({ tmdb_id: tmdbId }),
+  });
+}
+
 // ── USER ──
 
 export function getHistory(): Promise<WatchHistory[]> {

@@ -116,14 +116,15 @@ function normalizeEpisode(row) {
 
 function episodeMatchesKey(ep, key) {
   const normalizedKey = String(key || '').toLowerCase();
-  const keyNoPrefix = normalizedKey.replace(/^(id:|title:)/, '');
+  const normalizedAlias = normalizedKey.replace(/^sid:/, 'id:').replace(/^st:/, 'title:');
+  const keyNoPrefix = normalizedAlias.replace(/^(id:|title:)/, '');
   const cleanStr = s => String(s || '').replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
   return ep.series_key === key ||
-    String(ep.series_key || '').toLowerCase() === normalizedKey ||
+    String(ep.series_key || '').toLowerCase() === normalizedAlias ||
     String(ep.series_id || '') === key ||
     String(ep.series_id || '') === keyNoPrefix ||
     ep.series_title === key ||
-    String(ep.series_title || '').toLowerCase() === normalizedKey.replace(/^title:/, '') ||
+    String(ep.series_title || '').toLowerCase() === normalizedAlias.replace(/^title:/, '') ||
     cleanStr(ep.series_title) === cleanStr(keyNoPrefix);
 }
 

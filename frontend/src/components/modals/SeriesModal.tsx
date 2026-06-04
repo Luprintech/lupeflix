@@ -5,11 +5,11 @@ import { ModalShell } from './ModalShell';
 import { FavoriteButtons } from './FavoriteButtons';
 import { Spinner } from '../ui/Spinner';
 import { StarRating } from '../ui/StarRating';
-import { getSeriesDetail, refreshSeriesMetadata } from '../../lib/services';
-import { tmdbBackdrop, tmdbStill } from '../../lib/tmdb';
+import { getSeriesDetail, refreshSeriesMetadata, setSeriesTmdb, tmdbSearch } from '../../lib/services';
+import { tmdbBackdrop, tmdbImg, tmdbStill } from '../../lib/tmdb';
 import { formatDuration, splitGenres } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Episode } from '../../types';
+import type { Episode, TmdbSearchResult } from '../../types';
 
 interface SeriesModalProps {
   seriesKey: string | null;
@@ -21,6 +21,9 @@ export function SeriesModal({ seriesKey, onClose, onPlay }: SeriesModalProps) {
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [season, setSeason] = useState<string | null>(null);
+  const [identifyOpen, setIdentifyOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<TmdbSearchResult[]>([]);
 
   const { data: series, isLoading } = useQuery({
     queryKey: ['series', seriesKey],
@@ -36,6 +39,28 @@ export function SeriesModal({ seriesKey, onClose, onPlay }: SeriesModalProps) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const identify = useMutation({
+    mutationFn: (tmdbId: number) => setSeriesTmdb(seriesKey as string, tmdbId),
+    onSuccess: () => {
+      toast.success('Portada y metadatos de serie actualizados');
+      setIdentifyOpen(false);
+      setResults([]);
+      void qc.invalidateQueries({ queryKey: ['series'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const searchTmdb = async () => {
+    const q = (query || series?.series_title || '').trim();
+    if (!q) return;
+    try {
+      const data = await tmdbSearch(q, 'tv');
+      setResults(data.results ?? []);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo buscar en TMDB');
+    }
+  };
 
   const seasonNumbers = useMemo(
     () =>
@@ -100,14 +125,73 @@ export function SeriesModal({ seriesKey, onClose, onPlay }: SeriesModalProps) {
             )}
 
             {isAdmin && (
-              <button
-                type="button"
-                onClick={() => refresh.mutate()}
-                disabled={refresh.isPending}
-                className="rounded border border-netflix-border px-4 py-2 text-sm font-medium text-netflix-muted transition-colors hover:border-white hover:text-white disabled:opacity-50"
-              >
-                {refresh.isPending ? 'Identificando…' : 'Identificar episodios'}
-              </button>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => refresh.mutate()}
+                    disabled={refresh.isPending}
+                    className="rounded border border-netflix-border px-4 py-2 text-sm font-medium text-netflix-muted transition-colors hover:border-white hover:text-white disabled:opacity-50"
+                  >
+                    {refresh.isPending ? 'Identificando?' : 'Identificar episodios'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIdentifyOpen((v) => !v);
+                      setQuery(series.series_title);
+                    }}
+                    className="rounded bg-netflix-red px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-netflix-red2"
+                  >
+                    Identificar portada de serie
+                  </button>
+                </div>
+
+                {identifyOpen && (
+                  <div className="rounded-lg border border-netflix-border bg-netflix-bg p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void searchTmdb();
+                        }}
+                        placeholder="Buscar serie en TMDB..."
+                        className="flex-1 rounded border border-netflix-border bg-netflix-surface px-3 py-2 text-sm text-white focus:border-netflix-red focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void searchTmdb()}
+                        className="rounded bg-netflix-red px-4 py-2 text-sm font-bold text-white"
+                      >
+                        Buscar
+                      </button>
+                    </div>
+
+                    {results.length > 0 && (
+                      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {results.slice(0, 8).map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => identify.mutate(item.id)}
+                            disabled={identify.isPending}
+                            className="rounded border border-netflix-border bg-netflix-surface p-2 text-left transition-colors hover:border-white disabled:opacity-60"
+                          >
+                            <img
+                              src={tmdbImg(item.poster_path, 'w185') || `https://placehold.co/185x278/16162a/777?text=${encodeURIComponent(item.name || item.title || '?')}`}
+                              alt={item.name || item.title || ''}
+                              className="mb-2 aspect-[2/3] w-full rounded object-cover"
+                            />
+                            <p className="line-clamp-2 text-xs font-semibold text-white">{item.name || item.title}</p>
+                            <p className="text-[11px] text-netflix-muted">{(item.first_air_date || item.release_date || '').slice(0, 4)}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Season selector */}

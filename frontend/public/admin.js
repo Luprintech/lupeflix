@@ -248,7 +248,7 @@ function renderLibraryList(id, items) {
         m.season_count > 1 ? `${m.season_count} temp` : '',
       ].filter(Boolean).join(', ');
       return `
-        <div class="media-item media-series" data-idx="${i}" data-series-key="${escHtml(m.series_key || m.title)}">
+        <div class="media-item media-series" data-idx="${i}" data-series-key="${escHtml(seriesKeyForAdmin(m))}">
           <img class="media-poster"
             src="${imgUrl(m.series_poster || m.poster_path) || 'https://placehold.co/44x60/16162a/444?text=?'}"
             alt="" onerror="this.src='https://placehold.co/44x60/16162a/444?text=?'" />
@@ -363,6 +363,7 @@ async function refreshSeriesMeta(idx) {
   const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
   if (!seriesEl) return;
   const seriesKey = seriesEl.dataset.seriesKey;
+  if (!seriesKey) { showToast('Error: serie sin clave identificable'); return; }
   const btns = seriesEl.querySelectorAll('.btn-icon');
   const btn  = btns[2]; // third button is 🔄
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
@@ -381,6 +382,7 @@ async function openSeriesIdentify(idx) {
   const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
   if (!seriesEl) return;
   const seriesKey   = seriesEl.dataset.seriesKey;
+  if (!seriesKey) { showToast('Error: serie sin clave identificable'); return; }
   const seriesTitle = seriesEl.querySelector('.media-title')?.textContent || '';
 
   // Open panel and show identify form at top
@@ -434,7 +436,7 @@ async function searchSeriesTmdb(idx) {
 async function applySeriesMatch(idx, tmdbId) {
   const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
   const seriesKey = seriesEl?.dataset.seriesKey;
-  if (!seriesKey) return;
+  if (!seriesKey) { showToast('Error: serie sin clave identificable'); return; }
   const el = document.getElementById(`sid-r-${idx}`);
   if (el) el.innerHTML = '<p class="muted">Aplicando metadatos a todos los episodios... puede tardar unos segundos.</p>';
   try {

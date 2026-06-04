@@ -175,8 +175,8 @@ function groupTvAsSeriesCards(items) {
   for (const m of items) {
     if (m.type !== 'tv') { result.push(m); continue; }
     const key = m.series_id
-      ? `sid:${m.series_id}`
-      : `st:${(m.series_title || m.title || '').toLowerCase().slice(0, 80)}`;
+      ? `id:${m.series_id}`
+      : `title:${(m.series_title || m.title || '').toLowerCase().slice(0, 80)}`;
     if (!seriesMap.has(key)) {
       const card = {
         ...m,
