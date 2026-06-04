@@ -108,6 +108,14 @@ const migrations = [
 ];
 migrations.forEach(m => { if (!existingCols.includes(m.col)) db.exec(m.sql); });
 
+const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+const userMigrations = [
+  { col: 'email_verified', sql: 'ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 1' },
+  { col: 'verification_token', sql: 'ALTER TABLE users ADD COLUMN verification_token TEXT' },
+  { col: 'verification_sent_at', sql: 'ALTER TABLE users ADD COLUMN verification_sent_at DATETIME' },
+];
+userMigrations.forEach(m => { if (!userCols.includes(m.col)) db.exec(m.sql); });
+
 // Cleanup: remove all documentary content (by type AND by file path origin)
 db.exec(`DELETE FROM movies WHERE type = 'documentary'`);
 db.exec(`DELETE FROM movies WHERE file_path LIKE '%Documentales%' OR file_path LIKE '%Documentary%' OR file_path LIKE '%Documental%'`);

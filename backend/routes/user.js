@@ -4,7 +4,15 @@ const db = require('../db');
 
 // ── AUTH MIDDLEWARE ──
 function requireUser(req, res, next) {
-  const token = req.headers['x-user-token'];
+  const cookies = Object.fromEntries(String(req.headers.cookie || '')
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const idx = part.indexOf('=');
+      return idx === -1 ? [part, ''] : [part.slice(0, idx), decodeURIComponent(part.slice(idx + 1))];
+    }));
+  const token = req.headers['x-user-token'] || cookies.lupeflix_token;
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   const session = db.prepare('SELECT user_email FROM sessions WHERE token = ?').get(token);
   if (!session) return res.status(401).json({ error: 'Invalid session' });

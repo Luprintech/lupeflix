@@ -159,6 +159,17 @@ export function loginWithPassword(email: string, password: string): Promise<Auth
   });
 }
 
+export function registerWithPassword(
+  name: string,
+  email: string,
+  password: string
+): Promise<{ ok: boolean; verification_required: boolean; email_sent: boolean }> {
+  return request('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ name, email, password }),
+  });
+}
+
 export function loginWithGoogle(credential: string): Promise<AuthResponse> {
   return request<AuthResponse>('/api/auth/google', {
     method: 'POST',
@@ -166,8 +177,8 @@ export function loginWithGoogle(credential: string): Promise<AuthResponse> {
   });
 }
 
-export function fetchMe(): Promise<{ user: User }> {
-  return request<{ user: User }>('/api/auth/me');
+export function fetchMe(): Promise<{ user: User; token?: string }> {
+  return request<{ user: User; token?: string }>('/api/auth/me');
 }
 
 export function logout(): Promise<{ ok: boolean }> {

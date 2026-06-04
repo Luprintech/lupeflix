@@ -17,7 +17,7 @@ export function clearToken(): void {
 }
 
 export function getStoredUser(): string | null {
-  return localStorage.getItem(USER_KEY);
+  return localStorage.getItem(USER_KEY) || localStorage.getItem(LEGACY_SESSION_KEY);
 }
 
 export function setStoredUser(json: string): void {

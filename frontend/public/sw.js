@@ -1,7 +1,7 @@
 // LupeFlix service worker — React SPA build.
 // Network-first for navigation and the admin panel so deployments never serve
 // a stale shell; cache-first for hashed /assets and images.
-const CACHE = 'lupeflix-v12-react';
+const CACHE = 'lupeflix-v13-auth';
 const APP_SHELL = ['/', '/index.html', '/admin.html', '/manifest.json'];
 
 self.addEventListener('install', (event) => {

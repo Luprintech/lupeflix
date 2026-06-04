@@ -1,5 +1,17 @@
 const db = require('./db');
 
+function cookieToken(req) {
+  const cookies = Object.fromEntries(String(req.headers.cookie || '')
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const idx = part.indexOf('=');
+      return idx === -1 ? [part, ''] : [part.slice(0, idx), decodeURIComponent(part.slice(idx + 1))];
+    }));
+  return cookies.lupeflix_token;
+}
+
 /**
  * Shared admin middleware for all routes.
  *
@@ -16,7 +28,7 @@ function requireAdmin(req, res, next) {
   ) return next();
 
   // 2. User session token (main app admin users)
-  const token = req.headers['x-user-token'];
+  const token = req.headers['x-user-token'] || cookieToken(req);
   if (token) {
     if (!process.env.ADMIN_EMAIL) return next(); // no email restriction — any session passes
     const session = db.prepare('SELECT user_email FROM sessions WHERE token = ?').get(token);

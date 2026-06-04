@@ -40,11 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // On mount: hydrate from localStorage, then validate the token with the server.
   useEffect(() => {
     const stored = getToken();
-    if (!stored) {
-      setIsLoading(false);
-      return;
-    }
-
     const cachedUser = getStoredUser();
     if (cachedUser) {
       try {
@@ -57,8 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const { user: me } = await fetchMe();
+        const meResponse = await fetchMe();
         if (cancelled) return;
+        if (!stored) {
+          // Session recovered from httpOnly cookie after refresh/admin navigation.
+          if (meResponse.token) persistToken(meResponse.token);
+          setTokenState(meResponse.token ?? getToken());
+        }
+        const me = meResponse.user;
         setUser(me);
         setStoredUser(JSON.stringify(me));
         await resolveAdmin(me.email);

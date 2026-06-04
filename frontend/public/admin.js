@@ -5,17 +5,33 @@ const TOKEN_KEY   = 'lupeflix_token';
 let adminToken = localStorage.getItem(ADMIN_KEY) || '';
 let userToken  = localStorage.getItem(TOKEN_KEY) || '';
 
-function getStoredUser() {
+async function getStoredUser() {
   try {
-    return JSON.parse(localStorage.getItem(USER_KEY) || localStorage.getItem(SESSION_KEY) || 'null');
-  } catch {
-    return null;
-  }
+    const local = JSON.parse(localStorage.getItem(USER_KEY) || localStorage.getItem(SESSION_KEY) || 'null');
+    if (local?.email) return local;
+  } catch {}
+
+  try {
+    const r = await fetch('/api/auth/me');
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data.token) {
+      userToken = data.token;
+      localStorage.setItem(TOKEN_KEY, data.token);
+    }
+    if (data.user) {
+      const json = JSON.stringify(data.user);
+      localStorage.setItem(USER_KEY, json);
+      localStorage.setItem(SESSION_KEY, json);
+      return data.user;
+    }
+  } catch {}
+  return null;
 }
 
 // ── ADMIN EMAIL RESTRICTION ──
 async function checkAdminAccess() {
-  const session = getStoredUser();
+  const session = await getStoredUser();
   if (!session?.email) return !!adminToken;
   try {
     const r = await fetch('/api/admin/check', { headers: { 'x-user-email': session.email } });
