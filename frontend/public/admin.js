@@ -1,11 +1,22 @@
 const ADMIN_KEY   = 'lupeflix_admin';
 const SESSION_KEY = 'lupeflix_session';
+const USER_KEY    = 'lupeflix_user';
+const TOKEN_KEY   = 'lupeflix_token';
 let adminToken = localStorage.getItem(ADMIN_KEY) || '';
+let userToken  = localStorage.getItem(TOKEN_KEY) || '';
+
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY) || localStorage.getItem(SESSION_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
 
 // ── ADMIN EMAIL RESTRICTION ──
 async function checkAdminAccess() {
-  const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-  if (!session) return false;
+  const session = getStoredUser();
+  if (!session?.email) return !!adminToken;
   try {
     const r = await fetch('/api/admin/check', { headers: { 'x-user-email': session.email } });
     const d = await r.json();
@@ -16,7 +27,7 @@ async function checkAdminAccess() {
 // ── TOKEN AUTH ──
 async function verifyToken(token) {
   try {
-    const r = await fetch('/api/movies?limit=1', { headers: { 'x-admin-token': token } });
+    const r = await fetch('/api/movies?limit=1', { headers: { 'x-admin-token': token, 'x-user-token': userToken } });
     return r.ok;
   } catch { return false; }
 }
@@ -30,11 +41,15 @@ async function init() {
         <div class="logo">LUPEFLIX <span>ADMIN</span></div>
         <h2 style="color:#ff8080;margin-top:8px">Acceso denegado</h2>
         <p style="color:rgba(255,255,255,0.4);font-size:0.85rem;margin:12px 0">Tu cuenta no tiene permisos de administrador.</p>
-        <a href="/" style="color:#e50914;font-size:0.9rem">← Volver a LupeFlix</a>
+        <a href="/home" style="color:#e50914;font-size:0.9rem">← Volver a LupeFlix</a>
       </div>`;
     document.getElementById('authScreen').style.display = 'flex';
     return;
   }
+
+  if (userToken) { showAdmin(); return; }
+
+  if (userToken) { showAdmin(); return; }
 
   if (adminToken) {
     if (await verifyToken(adminToken)) { showAdmin(); return; }
@@ -76,7 +91,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
 async function apiFetch(path, opts = {}) {
   const r = await fetch(`/api${path}`, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, ...(opts.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-token': adminToken,
+      'x-user-token': userToken,
+      ...(opts.headers || {}),
+    },
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || r.status);
@@ -229,7 +249,8 @@ function renderLibraryList(id, items) {
           <div class="media-badge">SERIE</div>
           <div class="media-actions">
             <button class="btn-icon btn-toggle" title="Ver episodios" onclick="toggleSeriesEpisodes(${i})">▶</button>
-            <button class="btn-icon" title="Actualizar metadata de serie" onclick="refreshSeriesMeta(${i})">🔄</button>
+            <button class="btn-icon" title="Identificar serie en TMDB" onclick="openSeriesIdentify(${i})">✏️</button>
+            <button class="btn-icon" title="Actualizar metadata desde TMDB" onclick="refreshSeriesMeta(${i})">🔄</button>
           </div>
         </div>
         <div class="series-episodes-panel" id="sep-${i}" style="display:none"></div>`;
@@ -327,7 +348,7 @@ async function refreshSeriesMeta(idx) {
   if (!seriesEl) return;
   const seriesKey = seriesEl.dataset.seriesKey;
   const btns = seriesEl.querySelectorAll('.btn-icon');
-  const btn = btns[1];
+  const btn  = btns[2]; // third button is 🔄
   if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
   try {
     await apiFetch(`/series/${encodeURIComponent(seriesKey)}/refresh-metadata`, { method: 'POST' });
@@ -336,6 +357,80 @@ async function refreshSeriesMeta(idx) {
   } catch (err) {
     showToast('Error: ' + escHtml(err.message));
     if (btn) { btn.disabled = false; btn.textContent = '🔄'; }
+  }
+}
+
+// ── SERIES IDENTIFY ──
+async function openSeriesIdentify(idx) {
+  const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
+  if (!seriesEl) return;
+  const seriesKey   = seriesEl.dataset.seriesKey;
+  const seriesTitle = seriesEl.querySelector('.media-title')?.textContent || '';
+
+  // Open panel and show identify form at top
+  const panel = document.getElementById(`sep-${idx}`);
+  panel.style.display = 'block';
+  if (seriesEl.querySelector('.btn-toggle')) seriesEl.querySelector('.btn-toggle').textContent = '▼';
+
+  panel.innerHTML = `
+    <div class="series-identify-panel">
+      <p class="muted" style="margin-bottom:8px;font-size:0.82rem;font-weight:600">Identificar serie en TMDB</p>
+      <div class="tmdb-search-row" style="margin-bottom:12px">
+        <input type="text" id="sid-q-${idx}" class="search-input" value="${escHtml(seriesTitle)}"
+          placeholder="Nombre de la serie..."
+          onkeydown="if(event.key==='Enter'){event.preventDefault();searchSeriesTmdb(${idx})}" />
+        <button class="btn-primary btn-sm" onclick="searchSeriesTmdb(${idx})">Buscar</button>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('sep-${idx}').style.display='none'">✕</button>
+      </div>
+      <div id="sid-r-${idx}" class="tmdb-results"></div>
+    </div>`;
+
+  // Auto-trigger search with current series title
+  await searchSeriesTmdb(idx);
+}
+
+async function searchSeriesTmdb(idx) {
+  const q  = document.getElementById(`sid-q-${idx}`)?.value.trim();
+  const el = document.getElementById(`sid-r-${idx}`);
+  if (!q || !el) return;
+  el.innerHTML = '<p class="muted">Buscando...</p>';
+  try {
+    const data = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&type=tv`).then(r => r.json());
+    if (!data.results?.length) { el.innerHTML = '<p class="muted">Sin resultados. Prueba con el título original.</p>'; return; }
+    el.innerHTML = data.results.slice(0, 8).map(item => {
+      const title  = escHtml(item.name || item.title || '');
+      const year   = (item.first_air_date || '').slice(0, 4);
+      const rating = item.vote_average ? ` · ⭐${Number(item.vote_average).toFixed(1)}` : '';
+      const poster = item.poster_path
+        ? `https://image.tmdb.org/t/p/w185${item.poster_path}`
+        : `https://placehold.co/130x195/16162a/444?text=${encodeURIComponent(item.name || '?')}`;
+      return `<div class="tmdb-card" onclick="applySeriesMatch(${idx}, ${item.id})">
+        <img src="${poster}" alt="${title}" />
+        <div class="tmdb-card-title">${title}</div>
+        <div class="tmdb-card-year">${year}${rating}</div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    el.innerHTML = `<p class="muted">Error: ${escHtml(err.message)}</p>`;
+  }
+}
+
+async function applySeriesMatch(idx, tmdbId) {
+  const seriesEl = document.querySelector(`.media-series[data-idx="${idx}"]`);
+  const seriesKey = seriesEl?.dataset.seriesKey;
+  if (!seriesKey) return;
+  const el = document.getElementById(`sid-r-${idx}`);
+  if (el) el.innerHTML = '<p class="muted">Aplicando metadatos a todos los episodios... puede tardar unos segundos.</p>';
+  try {
+    await apiFetch(`/series/${encodeURIComponent(seriesKey)}/set-tmdb`, {
+      method: 'POST',
+      body: JSON.stringify({ tmdb_id: tmdbId }),
+    });
+    showToast('✓ Serie identificada y episodios actualizados');
+    loadLibrary(...getLibFilters());
+  } catch (err) {
+    showToast('Error: ' + escHtml(err.message));
+    if (el) el.innerHTML = `<p class="muted">Error: ${escHtml(err.message)}</p>`;
   }
 }
 
@@ -613,7 +708,7 @@ async function startUpload(file) {
       const params = new URLSearchParams({ filename: file.name, chunkIndex: i, totalChunks: total, folder });
       const res    = await fetch(`/upload/chunk?${params}`, {
         method: 'POST',
-        headers: { 'x-admin-token': adminToken, 'Content-Type': 'application/octet-stream' },
+        headers: { 'x-admin-token': adminToken, 'x-user-token': userToken, 'Content-Type': 'application/octet-stream' },
         body: file.slice(i * CHUNK, (i + 1) * CHUNK),
       });
       const data = await res.json();
@@ -652,7 +747,7 @@ document.getElementById('scanBtn').addEventListener('click', async () => {
 
   const params = dir ? `?dir=${encodeURIComponent(dir)}` : '';
   try {
-    const res  = await fetch(`/stream/scan/files${params}`, { headers: { 'x-admin-token': adminToken } });
+    const res  = await fetch(`/stream/scan/files${params}`, { headers: { 'x-admin-token': adminToken, 'x-user-token': userToken } });
     const data = await res.json();
 
     if (!data.total) {
@@ -699,7 +794,7 @@ async function importOne(filePath, type, fileSize, btn) {
   try {
     const res = await fetch('/api/import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, 'x-user-token': userToken },
       body: JSON.stringify({ file_path: filePath, type, file_size: fileSize }),
     }).then(r => r.json());
 
@@ -743,7 +838,7 @@ document.getElementById('addAllBtn').addEventListener('click', async () => {
     try {
       const res = await fetch('/api/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, 'x-user-token': userToken },
         body: JSON.stringify({ file_path: file.path, type: file.auto_type, file_size: file.size }),
       }).then(r => r.json());
 
@@ -882,6 +977,97 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
+
+// ── SETTINGS ──
+const LANGUAGES = [
+  { code: 'es-ES', name: 'Español (Castellano)', flag: '🇪🇸' },
+  { code: 'es-MX', name: 'Español (Latino)',     flag: '🌎' },
+  { code: 'en-US', name: 'English (US)',          flag: '🇺🇸' },
+  { code: 'en-GB', name: 'English (UK)',          flag: '🇬🇧' },
+  { code: 'fr-FR', name: 'Français',              flag: '🇫🇷' },
+  { code: 'de-DE', name: 'Deutsch',               flag: '🇩🇪' },
+  { code: 'it-IT', name: 'Italiano',              flag: '🇮🇹' },
+  { code: 'pt-BR', name: 'Português (Brasil)',    flag: '🇧🇷' },
+  { code: 'pt-PT', name: 'Português (Portugal)',  flag: '🇵🇹' },
+  { code: 'ja-JP', name: '日本語',                flag: '🇯🇵' },
+  { code: 'ko-KR', name: '한국어',                flag: '🇰🇷' },
+  { code: 'zh-CN', name: '中文 (简体)',            flag: '🇨🇳' },
+];
+
+let currentSavedLang = 'es-ES';
+let selectedLang     = 'es-ES';
+
+async function loadSettings() {
+  try {
+    const data = await apiFetch('/settings');
+    currentSavedLang = data.tmdb_language || 'es-ES';
+    selectedLang     = currentSavedLang;
+    renderLangGrid();
+    updateSettingsFooter();
+  } catch {
+    document.getElementById('settingsCurrentLang').textContent = 'Error al cargar configuración';
+  }
+}
+
+function renderLangGrid() {
+  const grid = document.getElementById('langGrid');
+  if (!grid) return;
+  grid.innerHTML = LANGUAGES.map(l => `
+    <button type="button" class="lang-option${l.code === selectedLang ? ' selected' : ''}${l.code === currentSavedLang ? ' current-active' : ''}"
+      data-code="${l.code}" onclick="selectLang('${l.code}')">
+      <span class="lang-flag">${l.flag}</span>
+      <span class="lang-info">
+        <span class="lang-name">${l.name}</span>
+        <span class="lang-code">${l.code}</span>
+      </span>
+      <span class="lang-check">✓</span>
+    </button>
+  `).join('');
+}
+
+function selectLang(code) {
+  selectedLang = code;
+  renderLangGrid();
+  updateSettingsFooter();
+}
+
+function updateSettingsFooter() {
+  const noteEl = document.getElementById('settingsCurrentLang');
+  const saveBtn = document.getElementById('saveLangBtn');
+  const lang = LANGUAGES.find(l => l.code === currentSavedLang);
+  const hasChange = selectedLang !== currentSavedLang;
+  noteEl.innerHTML = `Activo: <strong>${lang ? lang.flag + ' ' + lang.name : currentSavedLang}</strong>`;
+  if (saveBtn) saveBtn.disabled = !hasChange;
+}
+
+document.getElementById('saveLangBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('saveLangBtn');
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  try {
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, 'x-user-token': userToken },
+      body: JSON.stringify({ tmdb_language: selectedLang }),
+    }).then(r => r.json());
+    currentSavedLang = selectedLang;
+    renderLangGrid();
+    updateSettingsFooter();
+    showToast('✅ Idioma guardado correctamente');
+  } catch {
+    showToast('❌ Error al guardar');
+    btn.disabled = false;
+  } finally {
+    btn.textContent = 'Guardar cambio';
+  }
+});
+
+// Load settings when section becomes active
+document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+  item.addEventListener('click', () => {
+    if (item.dataset.section === 'settings') loadSettings();
+  });
+});
 
 // ── INIT ──
 init();

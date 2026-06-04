@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'lupeflix_token';
 const USER_KEY = 'lupeflix_user';
+const LEGACY_SESSION_KEY = 'lupeflix_session';
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -12,6 +13,7 @@ export function setToken(token: string): void {
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(LEGACY_SESSION_KEY);
 }
 
 export function getStoredUser(): string | null {
@@ -20,6 +22,7 @@ export function getStoredUser(): string | null {
 
 export function setStoredUser(json: string): void {
   localStorage.setItem(USER_KEY, json);
+  localStorage.setItem(LEGACY_SESSION_KEY, json);
 }
 
 export function authHeaders(): Record<string, string> {
@@ -63,4 +66,4 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return (text ? JSON.parse(text) : {}) as T;
 }
 
-export { request, TOKEN_KEY, USER_KEY };
+export { request, TOKEN_KEY, USER_KEY, LEGACY_SESSION_KEY };

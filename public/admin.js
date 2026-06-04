@@ -1,11 +1,22 @@
 const ADMIN_KEY   = 'lupeflix_admin';
 const SESSION_KEY = 'lupeflix_session';
+const USER_KEY    = 'lupeflix_user';
+const TOKEN_KEY   = 'lupeflix_token';
 let adminToken = localStorage.getItem(ADMIN_KEY) || '';
+let userToken  = localStorage.getItem(TOKEN_KEY) || '';
+
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_KEY) || localStorage.getItem(SESSION_KEY) || 'null');
+  } catch {
+    return null;
+  }
+}
 
 // ── ADMIN EMAIL RESTRICTION ──
 async function checkAdminAccess() {
-  const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-  if (!session) return false;
+  const session = getStoredUser();
+  if (!session?.email) return !!adminToken;
   try {
     const r = await fetch('/api/admin/check', { headers: { 'x-user-email': session.email } });
     const d = await r.json();
@@ -16,7 +27,7 @@ async function checkAdminAccess() {
 // ── TOKEN AUTH ──
 async function verifyToken(token) {
   try {
-    const r = await fetch('/api/movies?limit=1', { headers: { 'x-admin-token': token } });
+    const r = await fetch('/api/movies?limit=1', { headers: { 'x-admin-token': token, 'x-user-token': userToken } });
     return r.ok;
   } catch { return false; }
 }
@@ -30,11 +41,15 @@ async function init() {
         <div class="logo">LUPEFLIX <span>ADMIN</span></div>
         <h2 style="color:#ff8080;margin-top:8px">Acceso denegado</h2>
         <p style="color:rgba(255,255,255,0.4);font-size:0.85rem;margin:12px 0">Tu cuenta no tiene permisos de administrador.</p>
-        <a href="home.html" style="color:#e50914;font-size:0.9rem">← Volver a LupeFlix</a>
+        <a href="/home" style="color:#e50914;font-size:0.9rem">← Volver a LupeFlix</a>
       </div>`;
     document.getElementById('authScreen').style.display = 'flex';
     return;
   }
+
+  if (userToken) { showAdmin(); return; }
+
+  if (userToken) { showAdmin(); return; }
 
   if (adminToken) {
     if (await verifyToken(adminToken)) { showAdmin(); return; }
@@ -76,7 +91,12 @@ document.querySelectorAll('.nav-item').forEach(item => {
 async function apiFetch(path, opts = {}) {
   const r = await fetch(`/api${path}`, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, ...(opts.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-token': adminToken,
+      'x-user-token': userToken,
+      ...(opts.headers || {}),
+    },
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || r.status);
@@ -688,7 +708,7 @@ async function startUpload(file) {
       const params = new URLSearchParams({ filename: file.name, chunkIndex: i, totalChunks: total, folder });
       const res    = await fetch(`/upload/chunk?${params}`, {
         method: 'POST',
-        headers: { 'x-admin-token': adminToken, 'Content-Type': 'application/octet-stream' },
+        headers: { 'x-admin-token': adminToken, 'x-user-token': userToken, 'Content-Type': 'application/octet-stream' },
         body: file.slice(i * CHUNK, (i + 1) * CHUNK),
       });
       const data = await res.json();
@@ -727,7 +747,7 @@ document.getElementById('scanBtn').addEventListener('click', async () => {
 
   const params = dir ? `?dir=${encodeURIComponent(dir)}` : '';
   try {
-    const res  = await fetch(`/stream/scan/files${params}`, { headers: { 'x-admin-token': adminToken } });
+    const res  = await fetch(`/stream/scan/files${params}`, { headers: { 'x-admin-token': adminToken, 'x-user-token': userToken } });
     const data = await res.json();
 
     if (!data.total) {
@@ -774,7 +794,7 @@ async function importOne(filePath, type, fileSize, btn) {
   try {
     const res = await fetch('/api/import', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, 'x-user-token': userToken },
       body: JSON.stringify({ file_path: filePath, type, file_size: fileSize }),
     }).then(r => r.json());
 
@@ -818,7 +838,7 @@ document.getElementById('addAllBtn').addEventListener('click', async () => {
     try {
       const res = await fetch('/api/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, 'x-user-token': userToken },
         body: JSON.stringify({ file_path: file.path, type: file.auto_type, file_size: file.size }),
       }).then(r => r.json());
 
@@ -1027,7 +1047,7 @@ document.getElementById('saveLangBtn')?.addEventListener('click', async () => {
   try {
     await fetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken, 'x-user-token': userToken },
       body: JSON.stringify({ tmdb_language: selectedLang }),
     }).then(r => r.json());
     currentSavedLang = selectedLang;
