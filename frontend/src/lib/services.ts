@@ -11,6 +11,8 @@ import type {
   TmdbSearchResponse,
   User,
   MediaType,
+  PersonResponse,
+  TmdbContentDetail,
 } from '../types';
 
 // ── MOVIES ──
@@ -52,6 +54,10 @@ export function getMovie(id: number): Promise<Movie> {
 
 export function getExtras(id: number): Promise<Extras> {
   return request<Extras>(`/api/movies/${id}/extras`);
+}
+
+export function getPerson(personId: number): Promise<PersonResponse> {
+  return request<PersonResponse>(`/api/movies/person/${personId}`);
 }
 
 // ── SERIES ──
@@ -176,6 +182,10 @@ export function checkAdmin(email: string): Promise<{ allowed: boolean }> {
 export function tmdbSearch(query: string, type: 'movie' | 'tv'): Promise<TmdbSearchResponse> {
   const qs = new URLSearchParams({ q: query, type });
   return request<TmdbSearchResponse>(`/api/tmdb/search?${qs.toString()}`);
+}
+
+export function getTmdbDetail(type: 'movie' | 'tv', tmdbId: number): Promise<TmdbContentDetail> {
+  return request<TmdbContentDetail>(`/api/tmdb/detail/${type}/${tmdbId}`);
 }
 
 export function identifyMovie(

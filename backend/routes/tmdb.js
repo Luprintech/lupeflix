@@ -5,10 +5,17 @@ const fetch   = require('node-fetch');
 const TMDB_KEY = process.env.TMDB_API_KEY || '2dca580c2a14b55200e784d157207b4d';
 const BASE     = 'https://api.themoviedb.org/3';
 
+function providerSummary(providers) {
+  const es = providers?.results?.ES || null;
+  if (!es) return { region: 'ES', link: null, flatrate: [], rent: [], buy: [] };
+  const map = arr => (arr || []).map(p => ({ id: p.provider_id, name: p.provider_name, logo_path: p.logo_path }));
+  return { region: 'ES', link: es.link || null, flatrate: map(es.flatrate), rent: map(es.rent), buy: map(es.buy) };
+}
+
 async function tmdbGet(endpoint, params = {}, lang = 'es-ES') {
   const url = new URL(`${BASE}${endpoint}`);
   url.searchParams.set('api_key', TMDB_KEY);
-  url.searchParams.set('language', lang);
+  if (lang) url.searchParams.set('language', lang);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url.toString());
   return r.json();
@@ -104,18 +111,24 @@ router.get('/search', async (req, res) => {
 // GET /api/tmdb/detail/:type/:id
 router.get('/detail/:type/:id', async (req, res) => {
   try {
+    const type = req.params.type === 'tv' ? 'tv' : 'movie';
+    const id = req.params.id;
+
     // Get es-ES first
-    const es = await tmdbGet(`/${req.params.type}/${req.params.id}`, {}, 'es-ES');
+    const [es, providers] = await Promise.all([
+      tmdbGet(`/${type}/${id}`, {}, 'es-ES'),
+      tmdbGet(`/${type}/${id}/watch/providers`, {}, ''),
+    ]);
 
     // Backfill empty overview with English
     if (!es.overview) {
       try {
-        const en = await tmdbGet(`/${req.params.type}/${req.params.id}`, {}, 'en-US');
+        const en = await tmdbGet(`/${type}/${id}`, {}, 'en-US');
         es.overview = en.overview || '';
       } catch {}
     }
 
-    res.json(es);
+    res.json({ ...es, providers: providerSummary(providers) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

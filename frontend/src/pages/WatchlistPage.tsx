@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { MovieGrid } from '../components/ui/MovieGrid';
+import { CatalogControls } from '../components/ui/CatalogControls';
 import { PosterGridSkeleton } from '../components/ui/Skeleton';
 import { useModal } from '../contexts/ModalContext';
+import { useCatalogPreferences } from '../hooks/useCatalogPreferences';
 import { getFavorites } from '../lib/services';
 
 export function WatchlistPage() {
   const { openCard } = useModal();
+  const { view, size, setView, setSize } = useCatalogPreferences();
   const { data, isLoading } = useQuery({
     queryKey: ['favorites', 'watchlist'],
     queryFn: () => getFavorites('watchlist'),
@@ -13,14 +16,19 @@ export function WatchlistPage() {
 
   return (
     <div className="px-4 pb-12 pt-20 sm:px-12">
-      <h1 className="mb-6 text-2xl font-black text-white sm:text-3xl">Ver después</h1>
+      <h1 className="mb-6 text-2xl font-black text-white sm:text-3xl">Ver despu?s</h1>
+      <div className="mb-6">
+        <CatalogControls view={view} size={size} onViewChange={setView} onSizeChange={setSize} />
+      </div>
       {isLoading ? (
         <PosterGridSkeleton count={12} />
       ) : (
         <MovieGrid
           items={data ?? []}
           onCardClick={openCard}
-          emptyMessage="Tu lista de Ver después está vacía."
+          view={view}
+          size={size}
+          emptyMessage="Tu lista de Ver despu?s est? vac?a."
         />
       )}
     </div>

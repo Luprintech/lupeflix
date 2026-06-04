@@ -2,14 +2,17 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MovieGrid } from '../components/ui/MovieGrid';
 import { GenreChips } from '../components/ui/GenreChips';
+import { CatalogControls } from '../components/ui/CatalogControls';
 import { PosterGridSkeleton } from '../components/ui/Skeleton';
 import { useModal } from '../contexts/ModalContext';
 import { useDebounce } from '../hooks/useDebounce';
+import { useCatalogPreferences } from '../hooks/useCatalogPreferences';
 import { getSeries } from '../lib/services';
 import { splitGenres } from '../lib/utils';
 
 export function SeriesPage() {
   const { openCard } = useModal();
+  const { view, size, setView, setSize } = useCatalogPreferences();
   const [genre, setGenre] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 350);
@@ -20,9 +23,7 @@ export function SeriesPage() {
   });
 
   const all = data?.results ?? [];
-  const series = genre
-    ? all.filter((m) => splitGenres(m.genres).includes(genre))
-    : all;
+  const series = genre ? all.filter((m) => splitGenres(m.genres).includes(genre)) : all;
 
   const genres = useMemo(() => {
     const set = new Set<string>();
@@ -46,6 +47,10 @@ export function SeriesPage() {
         <GenreChips genres={genres} active={genre} onSelect={setGenre} />
       </div>
 
+      <div className="mb-6">
+        <CatalogControls view={view} size={size} onViewChange={setView} onSizeChange={setSize} />
+      </div>
+
       {isLoading ? (
         <PosterGridSkeleton count={18} />
       ) : (
@@ -53,6 +58,8 @@ export function SeriesPage() {
           items={series}
           onCardClick={openCard}
           isSeries
+          view={view}
+          size={size}
           emptyMessage="No se encontraron series."
         />
       )}

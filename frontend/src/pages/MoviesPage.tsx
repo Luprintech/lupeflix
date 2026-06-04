@@ -3,20 +3,22 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MovieGrid } from '../components/ui/MovieGrid';
 import { GenreChips } from '../components/ui/GenreChips';
+import { CatalogControls } from '../components/ui/CatalogControls';
 import { PosterGridSkeleton } from '../components/ui/Skeleton';
 import { useModal } from '../contexts/ModalContext';
 import { useDebounce } from '../hooks/useDebounce';
+import { useCatalogPreferences } from '../hooks/useCatalogPreferences';
 import { getMovies } from '../lib/services';
 import { splitGenres } from '../lib/utils';
 
 export function MoviesPage() {
   const { openCard } = useModal();
+  const { view, size, setView, setSize } = useCatalogPreferences();
   const [searchParams, setSearchParams] = useSearchParams();
   const [genre, setGenre] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
   const debouncedSearch = useDebounce(search, 350);
 
-  // Keep the URL in sync with the search box.
   useEffect(() => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -48,11 +50,11 @@ export function MoviesPage() {
   return (
     <div className="px-4 pb-12 pt-20 sm:px-12">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-black text-white sm:text-3xl">Películas</h1>
+        <h1 className="text-2xl font-black text-white sm:text-3xl">Pel?culas</h1>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar películas..."
+          placeholder="Buscar pel?culas..."
           className="w-full rounded border border-netflix-border bg-netflix-surface px-4 py-2 text-sm text-white placeholder:text-netflix-muted focus:border-netflix-red focus:outline-none sm:w-72"
         />
       </div>
@@ -61,13 +63,19 @@ export function MoviesPage() {
         <GenreChips genres={genres} active={genre} onSelect={setGenre} />
       </div>
 
+      <div className="mb-6">
+        <CatalogControls view={view} size={size} onViewChange={setView} onSizeChange={setSize} />
+      </div>
+
       {isLoading ? (
         <PosterGridSkeleton count={18} />
       ) : (
         <MovieGrid
           items={movies}
           onCardClick={openCard}
-          emptyMessage="No se encontraron películas."
+          view={view}
+          size={size}
+          emptyMessage="No se encontraron pel?culas."
         />
       )}
     </div>

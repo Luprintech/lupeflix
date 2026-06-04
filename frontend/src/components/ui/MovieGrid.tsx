@@ -1,6 +1,7 @@
-import { motion } from 'framer-motion';
+﻿import { motion } from 'framer-motion';
 import type { Movie } from '../../types';
 import { Card } from './Card';
+import type { CatalogView, PosterSize } from './CatalogControls';
 
 interface MovieGridProps {
   items: Movie[];
@@ -8,7 +9,15 @@ interface MovieGridProps {
   isSeries?: boolean;
   showRating?: boolean;
   emptyMessage?: string;
+  view?: CatalogView;
+  size?: PosterSize;
 }
+
+const GRID_CLASSES: Record<PosterSize, string> = {
+  small: 'grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10',
+  medium: 'grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7',
+  large: 'grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+};
 
 export function MovieGrid({
   items,
@@ -16,6 +25,8 @@ export function MovieGrid({
   isSeries,
   showRating,
   emptyMessage = 'No hay nada por aquí todavía.',
+  view = 'grid',
+  size = 'medium',
 }: MovieGridProps) {
   if (!items.length) {
     return (
@@ -25,8 +36,13 @@ export function MovieGrid({
     );
   }
 
+  const listMode = view === 'list';
+  const gridClass = view === 'compact'
+    ? GRID_CLASSES.small
+    : GRID_CLASSES[size];
+
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+    <div className={listMode ? 'space-y-2' : `grid ${gridClass}`}>
       {items.map((m, i) => (
         <motion.div
           key={`${m.id}-${m.series_key ?? ''}`}
@@ -38,6 +54,8 @@ export function MovieGrid({
             movie={m}
             isSeries={isSeries}
             showRating={showRating}
+            variant={listMode ? 'list' : 'poster'}
+            compact={view === 'compact'}
             onClick={() => onCardClick(m)}
           />
         </motion.div>

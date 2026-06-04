@@ -100,6 +100,17 @@ export interface CastMember {
   profile_path?: string | null;
 }
 
+export interface PersonDetail {
+  id: number;
+  name: string;
+  biography?: string;
+  birthday?: string | null;
+  deathday?: string | null;
+  place_of_birth?: string | null;
+  profile_path?: string | null;
+  known_for_department?: string;
+}
+
 export interface SimilarItem {
   tmdb_id: number;
   media_type: string;
@@ -132,6 +143,27 @@ export interface Extras {
   similar: SimilarItem[];
   providers: ProviderSummary;
   error?: string;
+}
+
+export interface PersonResponse {
+  person: PersonDetail;
+  credits: SimilarItem[];
+}
+
+export interface TmdbContentDetail {
+  id: number;
+  title?: string;
+  name?: string;
+  overview?: string;
+  release_date?: string;
+  first_air_date?: string;
+  runtime?: number;
+  episode_run_time?: number[];
+  vote_average?: number;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  genres?: Array<{ id: number; name: string }>;
+  providers: ProviderSummary;
 }
 
 export interface PaginatedMovies {
