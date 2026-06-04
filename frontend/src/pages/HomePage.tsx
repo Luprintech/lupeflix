@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Hero } from '../components/hero/Hero';
 import { ContentRow } from '../components/carousel/ContentRow';
+import { ExternalContentModal } from '../components/modals/ExternalContentModal';
 import { GenreChips } from '../components/ui/GenreChips';
 import { RowSkeleton } from '../components/ui/Skeleton';
 import { useModal } from '../contexts/ModalContext';
@@ -13,6 +14,7 @@ import {
   getTop,
   getHistory,
   getBecauseWatched,
+  getUpcoming,
 } from '../lib/services';
 import { isSeriesCard, splitGenres } from '../lib/utils';
 import type { Movie } from '../types';
@@ -21,6 +23,7 @@ export function HomePage() {
   const { openCard, playMovie } = useModal();
   const navigate = useNavigate();
   const [genre, setGenre] = useState<string | null>(null);
+  const [external, setExternal] = useState<{ tmdbId: number; mediaType: 'movie' | 'tv' } | null>(null);
 
   const featured = useQuery({ queryKey: ['featured'], queryFn: getFeatured });
   const recent = useQuery({ queryKey: ['recent'], queryFn: getRecent });
@@ -33,6 +36,10 @@ export function HomePage() {
   const because = useQuery({
     queryKey: ['because-watched', 'all'],
     queryFn: () => getBecauseWatched(undefined, 20),
+  });
+  const upcoming = useQuery({
+    queryKey: ['upcoming', 'movie'],
+    queryFn: () => getUpcoming('movie', 20),
   });
 
   // Build genre list from everything we loaded.
@@ -116,6 +123,25 @@ export function HomePage() {
               showRating
             />
 
+
+            {upcoming.data?.results.length ? (
+              <ContentRow
+                title="Pr?ximos estrenos"
+                items={upcoming.data.results.map((item) => ({
+                  id: item.tmdb_id,
+                  title: item.title,
+                  poster_path: item.poster_path ?? undefined,
+                  backdrop_path: item.backdrop_path ?? undefined,
+                  year: item.year ?? undefined,
+                  rating: item.rating ?? undefined,
+                  type: item.media_type === 'tv' ? 'tv' : 'movie',
+                  tmdb_id: item.tmdb_id,
+                }))}
+                onCardClick={(m) => setExternal({ tmdbId: m.tmdb_id ?? m.id, mediaType: m.type === 'tv' ? 'tv' : 'movie' })}
+                showRating
+              />
+            ) : null}
+
             {because.data?.title && because.data.items.length > 0 && (
               <ContentRow
                 title={`Porque viste ${because.data.title}`}
@@ -126,6 +152,7 @@ export function HomePage() {
           </>
         )}
       </div>
+      <ExternalContentModal selection={external} onClose={() => setExternal(null)} />
     </div>
   );
 }

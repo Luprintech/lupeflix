@@ -18,6 +18,23 @@ async function tmdb(endpoint, params = {}, lang) {
   return r.json();
 }
 
+async function wikipediaBiography(name, lang = 'es') {
+  const api = `https://${lang}.wikipedia.org/w/api.php`;
+  const searchUrl = new URL(api);
+  searchUrl.searchParams.set('action', 'query');
+  searchUrl.searchParams.set('list', 'search');
+  searchUrl.searchParams.set('srsearch', name);
+  searchUrl.searchParams.set('format', 'json');
+  searchUrl.searchParams.set('origin', '*');
+  const search = await fetch(searchUrl.toString()).then(r => r.json()).catch(() => null);
+  const title = search?.query?.search?.[0]?.title;
+  if (!title) return '';
+
+  const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+  const summary = await fetch(summaryUrl).then(r => r.ok ? r.json() : null).catch(() => null);
+  return summary?.extract || '';
+}
+
 function providerSummary(providers) {
   const es = providers?.results?.ES || null;
   if (!es) return { region: 'ES', link: null, flatrate: [], rent: [], buy: [] };
@@ -265,10 +282,22 @@ router.get('/:id/extras', async (req, res) => {
 // PERSON DETAIL + FILMOGRAPHY
 router.get('/person/:personId', async (req, res) => {
   try {
-    const [person, combined] = await Promise.all([
+    let [person, combined] = await Promise.all([
       tmdb(`/person/${req.params.personId}`),
       tmdb(`/person/${req.params.personId}/combined_credits`),
     ]);
+
+    if (!person.biography) {
+      const en = await tmdb(`/person/${req.params.personId}`, {}, 'en-US').catch(() => null);
+      if (en?.biography) person = { ...person, biography: en.biography, biography_source: 'TMDB en-US' };
+    }
+
+    if (!person.biography && person.name) {
+      const wikiEs = await wikipediaBiography(person.name, 'es').catch(() => '');
+      const wikiEn = wikiEs ? '' : await wikipediaBiography(person.name, 'en').catch(() => '');
+      const wikiBio = wikiEs || wikiEn;
+      if (wikiBio) person = { ...person, biography: wikiBio, biography_source: wikiEs ? 'Wikipedia ES' : 'Wikipedia EN' };
+    }
 
     const credits = (combined.cast || [])
       .filter(c => c.media_type === 'movie' || c.media_type === 'tv')

@@ -13,6 +13,9 @@ import type {
   MediaType,
   PersonResponse,
   TmdbContentDetail,
+  ExternalWatchlistItem,
+  UpcomingResponse,
+  ProviderSummary,
 } from '../types';
 
 // ── MOVIES ──
@@ -186,6 +189,33 @@ export function tmdbSearch(query: string, type: 'movie' | 'tv'): Promise<TmdbSea
 
 export function getTmdbDetail(type: 'movie' | 'tv', tmdbId: number): Promise<TmdbContentDetail> {
   return request<TmdbContentDetail>(`/api/tmdb/detail/${type}/${tmdbId}`);
+}
+
+export function getUpcoming(type: 'movie' | 'tv' = 'movie', limit = 20): Promise<UpcomingResponse> {
+  return request<UpcomingResponse>(`/api/tmdb/upcoming?type=${type}&limit=${limit}`);
+}
+
+export function getExternalWatchlist(): Promise<ExternalWatchlistItem[]> {
+  return request<ExternalWatchlistItem[]>('/api/user/external-watchlist');
+}
+
+export function addExternalWatchlist(item: {
+  tmdb_id: number;
+  media_type: 'movie' | 'tv';
+  title: string;
+  year?: number | null;
+  poster_path?: string | null;
+  rating?: number | null;
+  providers?: ProviderSummary | null;
+}): Promise<{ ok: boolean; added: boolean }> {
+  return request('/api/user/external-watchlist', {
+    method: 'POST',
+    body: JSON.stringify(item),
+  });
+}
+
+export function removeExternalWatchlist(mediaType: 'movie' | 'tv', tmdbId: number): Promise<{ ok: boolean }> {
+  return request(`/api/user/external-watchlist/${mediaType}/${tmdbId}`, { method: 'DELETE' });
 }
 
 export function identifyMovie(

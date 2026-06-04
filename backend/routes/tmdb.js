@@ -12,6 +12,19 @@ function providerSummary(providers) {
   return { region: 'ES', link: es.link || null, flatrate: map(es.flatrate), rent: map(es.rent), buy: map(es.buy) };
 }
 
+function normalizeListItem(item) {
+  return {
+    tmdb_id: item.id,
+    media_type: item.media_type || (item.name ? 'tv' : 'movie'),
+    title: item.title || item.name,
+    poster_path: item.poster_path || null,
+    backdrop_path: item.backdrop_path || null,
+    year: parseInt((item.release_date || item.first_air_date || '').slice(0, 4)) || null,
+    rating: item.vote_average || null,
+    description: item.overview || '',
+  };
+}
+
 async function tmdbGet(endpoint, params = {}, lang = 'es-ES') {
   const url = new URL(`${BASE}${endpoint}`);
   url.searchParams.set('api_key', TMDB_KEY);
@@ -130,6 +143,23 @@ router.get('/detail/:type/:id', async (req, res) => {
 
     res.json({ ...es, providers: providerSummary(providers) });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/tmdb/upcoming?type=movie|tv&limit=20
+router.get('/upcoming', async (req, res) => {
+  const type = req.query.type === 'tv' ? 'tv' : 'movie';
+  const limit = Math.min(Number(req.query.limit || 20), 40);
+  try {
+    const endpoint = type === 'tv' ? '/tv/on_the_air' : '/movie/upcoming';
+    const data = await tmdbGet(endpoint, { region: 'ES', page: 1 }, 'es-ES');
+    const results = (data.results || [])
+      .map(item => normalizeListItem({ ...item, media_type: type }))
+      .filter(item => item.title && item.poster_path)
+      .slice(0, limit);
+    res.json({ results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

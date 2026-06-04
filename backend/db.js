@@ -68,6 +68,20 @@ db.exec(`
     UNIQUE(user_email, movie_id)
   );
 
+  CREATE TABLE IF NOT EXISTS external_watchlist (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email   TEXT NOT NULL,
+    tmdb_id      INTEGER NOT NULL,
+    media_type   TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    year         INTEGER,
+    poster_path  TEXT,
+    rating       REAL,
+    providers_json TEXT,
+    added_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_email, tmdb_id, media_type)
+  );
+
   CREATE TABLE IF NOT EXISTS user_settings (
     user_email    TEXT PRIMARY KEY,
     display_name  TEXT,

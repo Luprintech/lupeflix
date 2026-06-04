@@ -3,14 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { ModalShell } from './ModalShell';
 import { FavoriteButtons } from './FavoriteButtons';
 import { MetadataModal } from './MetadataModal';
+import { ExternalContentModal, ProvidersSection } from './ExternalContentModal';
 import { Spinner } from '../ui/Spinner';
 import { StarRating } from '../ui/StarRating';
 import { Card } from '../ui/Card';
-import { getMovie, getExtras, getPerson, getTmdbDetail } from '../../lib/services';
+import { getMovie, getExtras, getPerson } from '../../lib/services';
 import { tmdbBackdrop, tmdbImg } from '../../lib/tmdb';
 import { formatDuration, splitGenres } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
-import type { CastMember, Extras, Movie, Provider, ProviderSummary, SimilarItem } from '../../types';
+import type { CastMember, Extras, Movie, SimilarItem } from '../../types';
 
 interface MovieModalProps {
   movieId: number | null;
@@ -203,7 +204,7 @@ function MovieModalBody({
 
         {castMembers.length > 0 && <CastSection cast={castMembers} onOpenPerson={onOpenPerson} />}
 
-        {extras?.providers && <ProvidersSection providers={extras.providers} />}
+        {extras?.providers && <ProvidersSection providers={extras.providers} title={movie.title} />}
 
         {isAdmin && (
           <button
@@ -323,6 +324,11 @@ function PersonModal({
               <p className="mt-4 max-h-72 overflow-y-auto text-sm leading-relaxed text-white/90">
                 {data.person.biography || 'No hay biografía disponible en TMDB para este idioma.'}
               </p>
+              {data.person.biography_source && (
+                <p className="mt-2 text-xs text-netflix-muted">
+                  Fuente: {data.person.biography_source}
+                </p>
+              )}
             </div>
           </div>
 
@@ -346,103 +352,6 @@ function PersonModal({
         </div>
       )}
     </ModalShell>
-  );
-}
-
-function ExternalContentModal({ selection, onClose }: { selection: ExternalSelection | null; onClose: () => void }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['tmdb-detail', selection?.mediaType, selection?.tmdbId],
-    queryFn: () => getTmdbDetail(selection?.mediaType ?? 'movie', selection?.tmdbId as number),
-    enabled: selection != null,
-  });
-
-  const title = data?.title || data?.name || 'Contenido';
-  const year = (data?.release_date || data?.first_air_date || '').slice(0, 4);
-  const duration = data?.runtime || data?.episode_run_time?.[0];
-
-  return (
-    <ModalShell open={selection != null} onClose={onClose} maxWidth="max-w-3xl">
-      {isLoading || !data ? (
-        <div className="flex h-72 items-center justify-center"><Spinner className="h-9 w-9" /></div>
-      ) : (
-        <div>
-          <div className="relative aspect-video bg-black">
-            <img
-              src={tmdbImg(data.backdrop_path, 'original') || tmdbImg(data.poster_path, 'w780')}
-              alt={title}
-              className="h-full w-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-netflix-surface via-netflix-surface/40 to-transparent" />
-            <div className="absolute bottom-5 left-5 right-12">
-              <h2 className="text-3xl font-black text-white">{title}</h2>
-            </div>
-          </div>
-          <div className="space-y-5 p-5 sm:p-8">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-netflix-muted">
-              <StarRating rating={data.vote_average} />
-              {year && <span>{year}</span>}
-              {duration ? <span>{formatDuration(duration)}</span> : null}
-              <span className="rounded border border-netflix-border px-1.5 py-0.5 uppercase">
-                {selection?.mediaType === 'tv' ? 'Serie externa' : 'Película externa'}
-              </span>
-            </div>
-            {data.overview && <p className="text-sm leading-relaxed text-white/90 sm:text-base">{data.overview}</p>}
-            {data.genres?.length ? <Detail label="Géneros" value={data.genres.map((g) => g.name).join(', ')} /> : null}
-            <ProvidersSection providers={data.providers} />
-          </div>
-        </div>
-      )}
-    </ModalShell>
-  );
-}
-
-function ProvidersSection({ providers }: { providers: ProviderSummary }) {
-  const groups: Array<[string, Provider[]]> = [
-    ['Incluido en', providers.flatrate],
-    ['Alquiler', providers.rent],
-    ['Compra', providers.buy],
-  ];
-  const hasProviders = groups.some(([, list]) => list.length > 0);
-
-  if (!hasProviders) {
-    return <p className="text-sm text-netflix-muted">No hay plataformas de streaming disponibles para España en TMDB.</p>;
-  }
-
-  return (
-    <section>
-      <h3 className="mb-3 text-lg font-bold text-white">Dónde verla</h3>
-      <div className="space-y-3">
-        {groups.map(([label, list]) => list.length > 0 && (
-          <div key={label}>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-netflix-muted">{label}</p>
-            <div className="flex flex-wrap gap-2">
-              {list.map((provider) => (
-                <ProviderLink key={`${label}-${provider.id}`} provider={provider} href={providers.link} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ProviderLink({ provider, href }: { provider: Provider; href: string | null }) {
-  const content = (
-    <>
-      {provider.logo_path && <img src={tmdbImg(provider.logo_path, 'w45')} alt="" className="h-6 w-6 rounded" />}
-      <span>{provider.name}</span>
-    </>
-  );
-
-  const className = "inline-flex items-center gap-2 rounded-full border border-netflix-border bg-netflix-surface2 px-3 py-1.5 text-sm text-white transition-colors hover:border-white";
-
-  if (!href) return <span className={className}>{content}</span>;
-
-  return (
-    <a className={className} href={href} target="_blank" rel="noreferrer">
-      {content}
-    </a>
   );
 }
 

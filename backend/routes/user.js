@@ -52,6 +52,57 @@ router.get('/favorites/check/:movie_id', requireUser, (req, res) => {
   res.json({ is_favorite: !!fav, in_watchlist: !!later });
 });
 
+// ── EXTERNAL WATCHLIST (TMDB items not in local server) ──
+
+router.get('/external-watchlist', requireUser, (req, res) => {
+  const rows = db.prepare(`
+    SELECT * FROM external_watchlist
+    WHERE user_email = ?
+    ORDER BY added_at DESC
+  `).all(req.userEmail).map(row => ({
+    ...row,
+    providers: row.providers_json ? JSON.parse(row.providers_json) : null,
+  }));
+  res.json(rows);
+});
+
+router.post('/external-watchlist', requireUser, (req, res) => {
+  const { tmdb_id, media_type, title, year, poster_path, rating, providers } = req.body || {};
+  if (!tmdb_id || !media_type || !title) {
+    return res.status(400).json({ error: 'tmdb_id, media_type and title required' });
+  }
+  db.prepare(`
+    INSERT INTO external_watchlist
+      (user_email, tmdb_id, media_type, title, year, poster_path, rating, providers_json)
+    VALUES (?,?,?,?,?,?,?,?)
+    ON CONFLICT(user_email, tmdb_id, media_type) DO UPDATE SET
+      title=excluded.title,
+      year=excluded.year,
+      poster_path=excluded.poster_path,
+      rating=excluded.rating,
+      providers_json=excluded.providers_json,
+      added_at=CURRENT_TIMESTAMP
+  `).run(
+    req.userEmail,
+    Number(tmdb_id),
+    media_type,
+    title,
+    year || null,
+    poster_path || null,
+    rating || null,
+    providers ? JSON.stringify(providers) : null
+  );
+  res.json({ ok: true, added: true });
+});
+
+router.delete('/external-watchlist/:media_type/:tmdb_id', requireUser, (req, res) => {
+  db.prepare(`
+    DELETE FROM external_watchlist
+    WHERE user_email = ? AND media_type = ? AND tmdb_id = ?
+  `).run(req.userEmail, req.params.media_type, req.params.tmdb_id);
+  res.json({ ok: true });
+});
+
 // ── WATCH HISTORY ──
 
 // GET /api/user/history

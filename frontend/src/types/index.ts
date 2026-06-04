@@ -109,6 +109,7 @@ export interface PersonDetail {
   place_of_birth?: string | null;
   profile_path?: string | null;
   known_for_department?: string;
+  biography_source?: string;
 }
 
 export interface SimilarItem {
@@ -116,9 +117,11 @@ export interface SimilarItem {
   media_type: string;
   title: string;
   poster_path?: string | null;
+  backdrop_path?: string | null;
+  description?: string | null;
   year?: number | null;
   rating?: number | null;
-  in_library: boolean;
+  in_library?: boolean;
   library_id?: number | null;
 }
 
@@ -164,6 +167,22 @@ export interface TmdbContentDetail {
   backdrop_path?: string | null;
   genres?: Array<{ id: number; name: string }>;
   providers: ProviderSummary;
+}
+
+export interface ExternalWatchlistItem {
+  id: number;
+  tmdb_id: number;
+  media_type: 'movie' | 'tv';
+  title: string;
+  year?: number | null;
+  poster_path?: string | null;
+  rating?: number | null;
+  providers?: ProviderSummary | null;
+  added_at?: string;
+}
+
+export interface UpcomingResponse {
+  results: SimilarItem[];
 }
 
 export interface PaginatedMovies {

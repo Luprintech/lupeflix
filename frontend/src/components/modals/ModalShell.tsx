@@ -2,6 +2,25 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
+let openModalCount = 0;
+let previousBodyOverflow = '';
+
+function lockBodyScroll() {
+  if (openModalCount === 0) {
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  openModalCount += 1;
+}
+
+function unlockBodyScroll() {
+  openModalCount = Math.max(0, openModalCount - 1);
+  if (openModalCount === 0) {
+    document.body.style.overflow = previousBodyOverflow;
+    previousBodyOverflow = '';
+  }
+}
+
 interface ModalShellProps {
   open: boolean;
   onClose: () => void;
@@ -18,11 +37,10 @@ export function ModalShell({ open, onClose, children, maxWidth = 'max-w-4xl' }: 
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    lockBodyScroll();
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      unlockBodyScroll();
     };
   }, [open, onClose]);
 
