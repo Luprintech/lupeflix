@@ -7,13 +7,13 @@ const { omdb: omdbFetch, normalizeOmdb } = require('./omdb');
 
 const TMDB_KEY = process.env.TMDB_API_KEY || '2dca580c2a14b55200e784d157207b4d';
 const BASE     = 'https://api.themoviedb.org/3';
+const { getLang, getImgLang } = require('../settings');
 
-// ── LANGUAGE CHAIN: es-ES → en-US ──
-// Always prefer Castilian Spanish. If overview is empty, backfill with English.
-async function tmdb(endpoint, params = {}, lang = 'es-ES') {
+async function tmdb(endpoint, params = {}, lang) {
+  const l = lang ?? getLang();
   const url = new URL(`${BASE}${endpoint}`);
   url.searchParams.set('api_key', TMDB_KEY);
-  url.searchParams.set('language', lang);
+  if (l) url.searchParams.set('language', l);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(`TMDB ${r.status}`);
@@ -21,31 +21,27 @@ async function tmdb(endpoint, params = {}, lang = 'es-ES') {
 }
 
 async function tmdbWithFallback(endpoint, params = {}) {
-  const es = await tmdb(endpoint, params, 'es-ES');
-  // Backfill empty overview with English
-  if (!es.overview && !es.results) {
+  const lang = getLang();
+  const primary = await tmdb(endpoint, params, lang);
+  if (!primary.overview && !primary.results) {
     try {
       const en = await tmdb(endpoint, params, 'en-US');
-      es.overview = en.overview || '';
+      primary.overview = en.overview || '';
     } catch {}
   }
-  // Try to get Spanish poster
-  if (es.id && !es.results) {
+  if (primary.id && !primary.results) {
     try {
-      const mediaType = es.title ? 'movie' : 'tv';
-      const images = await tmdb(`/${mediaType}/${es.id}/images`, { include_image_language: 'es,null' }, '');
-      const esPoster = (images.posters || []).find(p => p.iso_639_1 === 'es');
-      if (esPoster) es.poster_path = esPoster.file_path;
+      const mediaType = primary.title ? 'movie' : 'tv';
+      const imgLang   = getImgLang();
+      const images    = await tmdb(`/${mediaType}/${primary.id}/images`, { include_image_language: `${imgLang},null` }, '');
+      const localPoster = (images.posters || []).find(p => p.iso_639_1 === imgLang);
+      if (localPoster) primary.poster_path = localPoster.file_path;
     } catch {}
   }
-  return es;
+  return primary;
 }
 
-function requireAdmin(req, res, next) {
-  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN)
-    return res.status(401).json({ error: 'Unauthorized' });
-  next();
-}
+const { requireAdmin } = require('../middleware');
 
 // ── FILENAME PARSERS ──
 
@@ -130,7 +126,7 @@ async function searchTMDB(rawTitle, year, mediaType /* movie|tv */) {
       try {
         const params = { query: variant };
         if (tryYear) params.year = tryYear;
-        const data = await tmdb(endpoint, params, 'es-ES');
+        const data = await tmdb(endpoint, params);
         const results = data.results || [];
         for (const r of results.slice(0, 5)) {
           const score = confidence(r, variant, tryYear);
@@ -177,7 +173,7 @@ async function fetchFullMetadata(tmdbId, mediaType, omdbData = null) {
   // Credits
   let director = '', cast = '';
   try {
-    const credits = await tmdb(`/${mediaType}/${tmdbId}/credits`, {}, 'es-ES');
+    const credits = await tmdb(`/${mediaType}/${tmdbId}/credits`);
     director = (credits.crew || []).filter(c => c.job === 'Director').slice(0, 2).map(c => c.name).join(', ');
     cast     = (credits.cast || []).slice(0, 6).map(c => c.name).join(', ');
   } catch {}
@@ -240,7 +236,7 @@ router.post('/', requireAdmin, async (req, res) => {
       // Episode details
       let epDetails = null;
       if (seriesItem?.id && epInfo) {
-        try { epDetails = await tmdb(`/tv/${seriesItem.id}/season/${epInfo.season}/episode/${epInfo.episode}`, {}, 'es-ES'); } catch {}
+        try { epDetails = await tmdb(`/tv/${seriesItem.id}/season/${epInfo.season}/episode/${epInfo.episode}`); } catch {}
       }
 
       const seriesTitle  = seriesItem ? (seriesItem.name || seriesItem.original_name || seriesRaw) : seriesRaw;
@@ -320,7 +316,7 @@ router.post('/', requireAdmin, async (req, res) => {
       // Strategy 3: Cross-reference — use OMDb IMDb ID to find TMDB record
       if (!tmdbItem && omdbData?.imdb_id) {
         try {
-          const found = await tmdb(`/find/${omdbData.imdb_id}`, { external_source: 'imdb_id' }, 'es-ES');
+          const found = await tmdb(`/find/${omdbData.imdb_id}`, { external_source: 'imdb_id' });
           const r = (found.movie_results || found.tv_results || [])[0];
           if (r) {
             const { detail, director, cast } = await fetchFullMetadata(r.id, tmdbType);

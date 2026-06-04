@@ -138,7 +138,7 @@ function renderHero(i) {
 
   if (m.is_series) {
     playBtn.style.display = 'none';
-    infoBtn.onclick = () => showSeriesModal(m.series_key || m.series_id || m.series_title || m.title);
+    infoBtn.onclick = () => showSeriesModal(m.series_key || (m.series_id != null ? `id:${m.series_id}` : null) || (m.series_title ? `title:${String(m.series_title).trim().toLowerCase()}` : null) || m.title);
   } else {
     playBtn.style.display = 'flex';
     playBtn.onclick = () => m.file_path ? play(m.id, m.title) : showToast('Sin archivo de video');
@@ -219,8 +219,12 @@ function buildCard(m, isSeries = false, topRated = false) {
     : poster(m);
   const badge    = isSer ? 'SERIE' : 'FILM';
   const badgeCls = isSer ? 'card-badge-blue' : 'card-badge-red';
+  const seriesKey = m.series_key ||
+    (m.series_id != null ? `id:${m.series_id}` : null) ||
+    (m.series_title ? `title:${String(m.series_title).trim().toLowerCase()}` : null) ||
+    m.title;
   const key     = isSer
-    ? `data-series="${escAttr(m.series_key || m.series_id || m.series_title || m.title)}"`
+    ? `data-series="${escAttr(seriesKey)}"`
     : `data-id="${m.id}"`;
   const info    = isSer && m.episode_count ? `${m.episode_count} ep` : (m.year || '');
   const ratingBadge = (topRated || m._score != null) && m.rating

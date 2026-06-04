@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-netflix-bg text-white font-sans antialiased;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  /* Netflix-style thin scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .text-shadow-hero {
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+  }
+
+  /* Skeleton shimmer for loading placeholders */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      #1f1f1f 25%,
+      #2a2a2a 37%,
+      #1f1f1f 63%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+}

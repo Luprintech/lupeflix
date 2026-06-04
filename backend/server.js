@@ -17,6 +17,7 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 }));
 
 // ── ROUTES ──
+app.use('/api/settings', require('./routes/settings'));
 app.use('/api/movies', require('./routes/movies'));
 app.use('/api/series',  require('./routes/series'));
 app.use('/api/rematch', require('./routes/rematch'));

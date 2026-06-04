@@ -6,11 +6,13 @@ const path    = require('path');
 
 const TMDB_KEY = process.env.TMDB_API_KEY || '2dca580c2a14b55200e784d157207b4d';
 const BASE     = 'https://api.themoviedb.org/3';
+const { getLang, getImgLang } = require('../settings');
 
-async function tmdb(endpoint, params = {}, lang = 'es-ES') {
+async function tmdb(endpoint, params = {}, lang) {
+  const l = lang ?? getLang();
   const url = new URL(`${BASE}${endpoint}`);
   url.searchParams.set('api_key', TMDB_KEY);
-  if (lang) url.searchParams.set('language', lang);
+  if (l) url.searchParams.set('language', l);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(`TMDB ${r.status}`);
@@ -18,26 +20,15 @@ async function tmdb(endpoint, params = {}, lang = 'es-ES') {
 }
 
 async function tmdbWithFallback(endpoint, params = {}) {
-  const es = await tmdb(endpoint, params, 'es-ES');
-  if (!es.overview) {
+  const primary = await tmdb(endpoint, params);
+  if (!primary.overview) {
     const en = await tmdb(endpoint, params, 'en-US').catch(() => ({}));
-    es.overview = en.overview || es.overview || '';
+    primary.overview = en.overview || primary.overview || '';
   }
-  return es;
+  return primary;
 }
 
-function requireAdmin(req, res, next) {
-  if (req.headers['x-admin-token'] === process.env.ADMIN_TOKEN) return next();
-
-  const token = req.headers['x-user-token'];
-  if (token) {
-    if (!process.env.ADMIN_EMAIL) return next();
-    const session = db.prepare('SELECT user_email FROM sessions WHERE token = ?').get(token);
-    if (session?.user_email === process.env.ADMIN_EMAIL) return next();
-  }
-
-  return res.status(401).json({ error: 'Unauthorized' });
-}
+const { requireAdmin } = require('../middleware');
 
 function cleanSeriesName(value = '') {
   let name = String(value || '').replace(/\.[^.]+$/, '');
@@ -125,11 +116,15 @@ function normalizeEpisode(row) {
 
 function episodeMatchesKey(ep, key) {
   const normalizedKey = String(key || '').toLowerCase();
+  const keyNoPrefix = normalizedKey.replace(/^(id:|title:)/, '');
+  const cleanStr = s => String(s || '').replace(/[._-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
   return ep.series_key === key ||
     String(ep.series_key || '').toLowerCase() === normalizedKey ||
     String(ep.series_id || '') === key ||
+    String(ep.series_id || '') === keyNoPrefix ||
     ep.series_title === key ||
-    String(ep.series_title || '').toLowerCase() === normalizedKey.replace(/^title:/, '');
+    String(ep.series_title || '').toLowerCase() === normalizedKey.replace(/^title:/, '') ||
+    cleanStr(ep.series_title) === cleanStr(keyNoPrefix);
 }
 
 function titleVariations(raw) {
@@ -147,7 +142,7 @@ async function findSeriesTmdbId(episodes, seriesTitle) {
 
   let best = null;
   for (const q of titleVariations(seriesTitle)) {
-    const data = await tmdb('/search/tv', { query: q }, 'es-ES').catch(() => null);
+    const data = await tmdb('/search/tv', { query: q }).catch(() => null);
     const result = data?.results?.[0];
     if (result?.id) { best = result; break; }
   }
@@ -179,7 +174,7 @@ async function enrichSeriesEpisodes(episodes, force = false) {
   const seasonNumbers = [...new Set(episodes.map(ep => Number(ep.season_number || 1)).filter(n => n >= 0))].sort((a, b) => a - b);
   const seasonData = new Map();
   for (const seasonNumber of seasonNumbers) {
-    const es = await tmdb(`/tv/${tmdbId}/season/${seasonNumber}`, {}, 'es-ES').catch(() => null);
+    const es = await tmdb(`/tv/${tmdbId}/season/${seasonNumber}`).catch(() => null);
     const en = es && (es.overview || es.episodes?.some(ep => ep.overview))
       ? null
       : await tmdb(`/tv/${tmdbId}/season/${seasonNumber}`, {}, 'en-US').catch(() => null);
@@ -373,6 +368,31 @@ router.get('/:key/seasons', async (req, res) => {
   } catch (err) {
     console.error('Error loading series seasons:', err);
     res.status(500).json({ error: 'Error al cargar la serie' });
+  }
+});
+
+// POST /api/series/:key/set-tmdb — set a specific TMDB series ID and re-enrich all episodes
+router.post('/:key/set-tmdb', requireAdmin, async (req, res) => {
+  try {
+    const key    = decodeURIComponent(req.params.key);
+    const { tmdb_id } = req.body || {};
+    if (!tmdb_id) return res.status(400).json({ error: 'tmdb_id required' });
+
+    let episodes = loadEpisodesForKey(key);
+    if (!episodes.length) return res.status(404).json({ error: 'Serie no encontrada', key });
+
+    // Pre-set series_id on every episode so enrichSeriesEpisodes uses this TMDB ID
+    const stmt = db.prepare('UPDATE movies SET series_id = ? WHERE id = ?');
+    const tx   = db.transaction(eps => { for (const ep of eps) stmt.run(Number(tmdb_id), ep.id); });
+    tx(episodes);
+
+    // Re-load and force full enrichment with the correct ID
+    episodes = loadEpisodesForKey(key);
+    const enrichment = await enrichSeriesEpisodes(episodes, true);
+    const refreshed  = loadEpisodesForKey(key);
+    res.json({ ok: true, ...enrichment, series: buildSeriesPayload(refreshed, enrichment) });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Error identificando serie' });
   }
 });
 

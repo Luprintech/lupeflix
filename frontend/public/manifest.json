@@ -1,0 +1,17 @@
+{
+  "name": "LupeFlix",
+  "short_name": "LupeFlix",
+  "description": "Tu biblioteca personal de películas y series",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#e50914",
+  "orientation": "any",
+  "icons": [],
+  "categories": ["entertainment"],
+  "screenshots": [],
+  "shortcuts": [
+    { "name": "Películas", "url": "/movies", "description": "Ver películas" },
+    { "name": "Series",    "url": "/series", "description": "Ver series" }
+  ]
+}

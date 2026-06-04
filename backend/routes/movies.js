@@ -5,10 +5,12 @@ const fetch   = require('node-fetch');
 
 const TMDB_KEY = process.env.TMDB_API_KEY || '2dca580c2a14b55200e784d157207b4d';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
+const { getLang } = require('../settings');
 
-async function tmdb(endpoint, params = {}, lang = 'es-ES') {
+async function tmdb(endpoint, params = {}, lang) {
+  const l = lang ?? getLang();
   const u = new URL(`${TMDB_BASE}${endpoint}`);
-  if (lang !== null) u.searchParams.set('language', lang);
+  if (l !== null) u.searchParams.set('language', l);
   u.searchParams.set('api_key', TMDB_KEY);
   Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
   const r = await fetch(u.toString());
@@ -264,8 +266,8 @@ router.get('/:id/extras', async (req, res) => {
 router.get('/person/:personId', async (req, res) => {
   try {
     const [person, combined] = await Promise.all([
-      tmdb(`/person/${req.params.personId}`, {}, 'es-ES'),
-      tmdb(`/person/${req.params.personId}/combined_credits`, {}, 'es-ES'),
+      tmdb(`/person/${req.params.personId}`),
+      tmdb(`/person/${req.params.personId}/combined_credits`),
     ]);
 
     const credits = (combined.cast || [])
@@ -304,11 +306,7 @@ router.get('/:id', (req, res) => {
 });
 
 // CRUD (admin)
-function requireAdmin(req, res, next) {
-  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN)
-    return res.status(401).json({ error: 'Unauthorized' });
-  next();
-}
+const { requireAdmin } = require('../middleware');
 
 router.post('/', requireAdmin, (req, res) => {
   const { title, original_title, year, description, genres, director, cast, rating, duration, type, poster_path, backdrop_path, tmdb_id, file_path, file_size } = req.body;

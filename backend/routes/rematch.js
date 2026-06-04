@@ -8,25 +8,14 @@ const db      = require('../db');
 
 const TMDB_KEY = process.env.TMDB_API_KEY || '2dca580c2a14b55200e784d157207b4d';
 const BASE     = 'https://api.themoviedb.org/3';
+const { getLang, getImgLang } = require('../settings');
+const { requireAdmin } = require('../middleware');
 
-function requireAdmin(req, res, next) {
-  if (req.headers['x-admin-token'] === process.env.ADMIN_TOKEN) return next();
-
-  // Allow the configured admin email from the normal app, so admins can identify
-  // metadata without opening the dashboard token flow.
-  const token = req.headers['x-user-token'];
-  if (token && process.env.ADMIN_EMAIL) {
-    const session = db.prepare('SELECT user_email FROM sessions WHERE token = ?').get(token);
-    if (session?.user_email === process.env.ADMIN_EMAIL) return next();
-  }
-
-  return res.status(401).json({ error: 'Unauthorized' });
-}
-
-async function tmdb(endpoint, lang = 'es-ES', extraParams = {}) {
+async function tmdb(endpoint, lang, extraParams = {}) {
+  const l = lang ?? getLang();
   const url = new URL(`${BASE}${endpoint}`);
   url.searchParams.set('api_key', TMDB_KEY);
-  if (lang) url.searchParams.set('language', lang);
+  if (l) url.searchParams.set('language', l);
   Object.entries(extraParams).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url.toString());
   if (!r.ok) throw new Error(`TMDB ${r.status}`);
@@ -36,7 +25,7 @@ async function tmdb(endpoint, lang = 'es-ES', extraParams = {}) {
 async function applyMetadata(movie, tmdbId, mediaType, saveType = null) {
   const lookupType = mediaType === 'tv' ? 'tv' : 'movie';
   const libraryType = saveType === 'documentary' ? 'documentary' : lookupType;
-  const detail = await tmdb(`/${lookupType}/${tmdbId}`, 'es-ES');
+  const detail = await tmdb(`/${lookupType}/${tmdbId}`);
 
   if (!detail.overview) {
     const en = await tmdb(`/${lookupType}/${tmdbId}`, 'en-US').catch(() => ({}));
@@ -45,14 +34,15 @@ async function applyMetadata(movie, tmdbId, mediaType, saveType = null) {
 
   let posterPath = detail.poster_path;
   try {
-    const images = await tmdb(`/${lookupType}/${tmdbId}/images`, '', { include_image_language: 'es,null' });
-    const esPoster = (images.posters || []).find(p => p.iso_639_1 === 'es');
-    if (esPoster) posterPath = esPoster.file_path;
+    const imgLang = getImgLang();
+    const images  = await tmdb(`/${lookupType}/${tmdbId}/images`, '', { include_image_language: `${imgLang},null` });
+    const localPoster = (images.posters || []).find(p => p.iso_639_1 === imgLang);
+    if (localPoster) posterPath = localPoster.file_path;
   } catch {}
 
   let director = '', cast = '';
   try {
-    const credits = await tmdb(`/${lookupType}/${tmdbId}/credits`, 'es-ES');
+    const credits = await tmdb(`/${lookupType}/${tmdbId}/credits`);
     director = (credits.crew || []).filter(c => c.job === 'Director').slice(0, 2).map(c => c.name).join(', ');
     cast     = (credits.cast || []).slice(0, 8).map(c => c.name).join(', ');
   } catch {}
@@ -120,7 +110,7 @@ async function autoFindOnTmdb(movie) {
         try {
           const params = { query: q };
           if (year) params.year = year;
-          const data = await tmdb(endpoint, 'es-ES', params);
+          const data = await tmdb(endpoint, undefined, params);
           const r = (data.results || [])[0];
           if (r) return { tmdbId: r.id, mediaType };
         } catch {}
@@ -200,13 +190,13 @@ router.post('/:id/auto-search', requireAdmin, async (req, res) => {
 
   // Pass 1: with year in Spanish
   for (const q of unique) {
-    await search(q, movie.year, 'es-ES');
+    await search(q, movie.year);
     if (results.length >= 6) break;
   }
-  // Pass 2: without year in Spanish
+  // Pass 2: without year in selected language
   if (results.length < 4) {
     for (const q of unique) {
-      await search(q, null, 'es-ES');
+      await search(q, null);
       if (results.length >= 6) break;
     }
   }
