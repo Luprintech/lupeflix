@@ -41,17 +41,26 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
+interface RequestOptions extends RequestInit {
+  /** If true, a 401 will throw but will NOT clear the token or redirect. Use for silent auth checks. */
+  silent401?: boolean;
+}
+
+async function request<T>(url: string, options?: RequestOptions): Promise<T> {
+  const { silent401, ...fetchOptions } = options ?? {};
+
   const res = await fetch(url, {
-    ...options,
-    headers: { ...authHeaders(), ...(options?.headers || {}) },
+    ...fetchOptions,
+    headers: { ...authHeaders(), ...(fetchOptions?.headers ?? {}) },
   });
 
   if (res.status === 401) {
-    // Session expired or invalid — drop credentials and bounce to login.
-    clearToken();
-    if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
-      window.location.href = '/login';
+    if (!silent401) {
+      // Mid-session expiry: drop credentials and hard-redirect.
+      clearToken();
+      if (!window.location.pathname.startsWith('/login') && window.location.pathname !== '/') {
+        window.location.href = '/login';
+      }
     }
     throw new ApiError('No autenticado', 401);
   }
@@ -67,3 +76,4 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export { request, TOKEN_KEY, USER_KEY, LEGACY_SESSION_KEY };
+export type { RequestOptions };

@@ -1,4 +1,4 @@
-import { request, getToken } from './api';
+import { request, getToken, type RequestOptions } from './api';
 import type {
   Movie,
   PaginatedMovies,
@@ -188,7 +188,9 @@ export function loginWithGoogle(credential: string): Promise<AuthResponse> {
 }
 
 export function fetchMe(): Promise<{ user: User; token?: string }> {
-  return request<{ user: User; token?: string }>('/api/auth/me');
+  // silent401: don't hard-redirect on 401 — AuthContext handles the state gracefully.
+  const opts: RequestOptions = { silent401: true };
+  return request<{ user: User; token?: string }>('/api/auth/me', opts);
 }
 
 export function logout(): Promise<{ ok: boolean }> {

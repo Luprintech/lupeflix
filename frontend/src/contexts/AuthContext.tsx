@@ -7,6 +7,7 @@ import {
   clearToken,
   getStoredUser,
   setStoredUser,
+  ApiError,
 } from '../lib/api';
 import { fetchMe, checkAdmin, logout as logoutRequest } from '../lib/services';
 
@@ -23,10 +24,19 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setTokenState] = useState<string | null>(getToken());
+  // Optimistic init: if a token exists in localStorage trust it immediately.
+  // This prevents a flash-to-login on every page refresh while we validate.
+  const initialToken = getToken();
+  const [user, setUser] = useState<User | null>(() => {
+    const cached = getStoredUser();
+    if (!cached) return null;
+    try { return JSON.parse(cached) as User; } catch { return null; }
+  });
+  const [token, setTokenState] = useState<string | null>(initialToken);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  // isLoading is false immediately if we already have a token (optimistic).
+  // We still validate in the background; only an explicit 401 kicks the user out.
+  const [isLoading, setIsLoading] = useState(!initialToken);
 
   const resolveAdmin = useCallback(async (email: string) => {
     try {
@@ -37,39 +47,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // On mount: hydrate from localStorage, then validate the token with the server.
+  // On mount: validate the token with the server.
+  // If we had a token (optimistic path), isLoading is already false — this runs silently.
+  // If we had no token, isLoading is true and we wait for this to finish.
   useEffect(() => {
-    const stored = getToken();
-    const cachedUser = getStoredUser();
-    if (cachedUser) {
-      try {
-        setUser(JSON.parse(cachedUser) as User);
-      } catch {
-        /* ignore malformed cache */
-      }
+    const storedToken = getToken();
+
+    // No token at all — nothing to validate, mark loading done and stay on login.
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
     }
 
     let cancelled = false;
     (async () => {
       try {
-        const meResponse = await fetchMe();
+        const { user: me, token: freshToken } = await fetchMe();
         if (cancelled) return;
-        if (!stored) {
-          // Session recovered from httpOnly cookie after refresh/admin navigation.
-          if (meResponse.token) persistToken(meResponse.token);
-          setTokenState(meResponse.token ?? getToken());
+
+        // Server may return a refreshed token (future-proofing).
+        if (freshToken && freshToken !== storedToken) {
+          persistToken(freshToken);
+          setTokenState(freshToken);
         }
-        const me = meResponse.user;
+
         setUser(me);
         setStoredUser(JSON.stringify(me));
         await resolveAdmin(me.email);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
-        // Invalid/expired token.
-        clearToken();
-        setUser(null);
-        setTokenState(null);
-        setIsAdmin(false);
+
+        const is401 = err instanceof ApiError && err.status === 401;
+        if (is401) {
+          // Server explicitly rejected the token — log out cleanly.
+          clearToken();
+          setUser(null);
+          setTokenState(null);
+          setIsAdmin(false);
+        }
+        // For network errors or 5xx: keep the cached auth state.
+        // The user is probably offline or the server is temporarily down.
       } finally {
         if (!cancelled) setIsLoading(false);
       }
