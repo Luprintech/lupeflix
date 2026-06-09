@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
+const { execSync, spawn } = require('child_process');
 const db = require('../db');
 
 const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v'];
@@ -22,14 +23,67 @@ function detectType(dirPath) {
   return 'movie';
 }
 
+// ── AUDIO TRACKS ──
+router.get('/:id/audio-tracks', (req, res) => {
+  const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
+  if (!movie?.file_path || !fs.existsSync(movie.file_path)) return res.json([]);
+
+  try {
+    const raw = execSync(
+      `ffprobe -v quiet -print_format json -show_streams -select_streams a "${movie.file_path.replace(/"/g, '\\"')}"`,
+      { timeout: 8000 }
+    ).toString();
+    const streams = JSON.parse(raw).streams || [];
+    if (streams.length <= 1) return res.json([]);
+
+    const tracks = streams.map((s, i) => ({
+      index: i,
+      language: s.tags?.language || 'und',
+      label: s.tags?.title || langLabel(s.tags?.language) || `Audio ${i + 1}`,
+      codec: s.codec_name,
+      channels: s.channels,
+    }));
+    res.json(tracks);
+  } catch {
+    res.json([]);
+  }
+});
+
+function langLabel(code) {
+  const MAP = { spa: 'Español', eng: 'English', jpn: '日本語', fre: 'Français', ger: 'Deutsch', ita: 'Italiano', por: 'Português', lat: 'Español Latino', es: 'Español', en: 'English' };
+  return MAP[code] || null;
+}
+
 // ── STREAM ──
 router.get('/:id', (req, res) => {
   const movie = db.prepare('SELECT * FROM movies WHERE id = ?').get(req.params.id);
   if (!movie || !movie.file_path) return res.status(404).send('Not found');
 
-  // file_path is stored as absolute path
   const filePath = movie.file_path;
   if (!fs.existsSync(filePath)) return res.status(404).send('File not found on disk');
+
+  // Audio track selection via ffmpeg
+  if (req.query.audio !== undefined) {
+    const audioIndex = Math.max(0, parseInt(req.query.audio, 10) || 0);
+    const startTime  = Math.max(0, parseFloat(req.query.t   || '0'));
+    const ff = spawn('ffmpeg', [
+      '-ss', String(startTime),
+      '-i', filePath,
+      '-map', '0:v:0',
+      '-map', `0:a:${audioIndex}`,
+      '-c:v', 'copy',
+      '-c:a', 'aac', '-b:a', '192k',
+      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+      '-f', 'mp4',
+      'pipe:1',
+    ]);
+    res.setHeader('Content-Type', 'video/mp4');
+    ff.stdout.pipe(res);
+    ff.stderr.on('data', () => {});
+    ff.on('error', () => res.end());
+    req.on('close', () => { try { ff.kill('SIGKILL'); } catch {} });
+    return;
+  }
 
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;

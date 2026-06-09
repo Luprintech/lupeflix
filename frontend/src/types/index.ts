@@ -235,3 +235,11 @@ export interface OsSearchResponse {
   message?: string;
   results?: OsSearchResult[];
 }
+
+export interface AudioTrackInfo {
+  index: number;
+  language: string;
+  label: string;
+  codec: string;
+  channels: number;
+}

@@ -29,8 +29,10 @@ import {
   searchOpenSubtitles,
   downloadSubtitle,
   getNextEpisode,
+  getAudioTracks,
+  buildAudioStreamUrl,
 } from '../../lib/services';
-import type { OsSearchResult, SubtitleTrack } from '../../types';
+import type { AudioTrackInfo, OsSearchResult, SubtitleTrack } from '../../types';
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -109,9 +111,11 @@ export function VideoPlayer({
   const [nextEpData,  setNextEpData]  = useState<{ id: number; title: string } | null>(null);
   const [nextEpCountdown, setNextEpCountdown] = useState(5);
   const [skipRipple,  setSkipRipple]  = useState<SkipRipple | null>(null);
-  const [audioTracks, setAudioTracks] = useState<{ id: string; label: string; language: string }[]>([]);
-  const [activeAudio, setActiveAudio] = useState<string | null>(null);
+  const [audioTracks, setAudioTracks] = useState<AudioTrackInfo[]>([]);
+  const [activeAudio, setActiveAudio] = useState<number>(0);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
+  // When non-null, player reloads with this src (audio track change)
+  const [activeSrc, setActiveSrc] = useState(src);
   // For double-tap detection on mobile
   const lastTapRef  = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
 
@@ -135,21 +139,21 @@ export function VideoPlayer({
 
   // ── mount / unmount ─────────────────────────────────────────────────────────
   useEffect(() => {
-    // Lock body scroll
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Set initial volume
-    if (videoRef.current) {
-      videoRef.current.volume = Math.max(0, Math.min(1, getStoredVolume()));
+    // Apply stored volume immediately — must happen before play() is called
+    const v = videoRef.current;
+    if (v) {
+      v.volume = Math.max(0, Math.min(1, getStoredVolume()));
+      v.muted  = false;
     }
 
-    // Periodic save
     saveTimer.current = setInterval(persistProgress, SAVE_INTERVAL_MS);
 
-    // Load local subtitles
     if (movieId > 0) {
       getLocalSubtitles(movieId).then(tracks => setSubTracks(tracks)).catch(() => {});
+      getAudioTracks(movieId).then(tracks => setAudioTracks(tracks)).catch(() => {});
     }
 
     return () => {
@@ -179,21 +183,12 @@ export function VideoPlayer({
       setTimeout(() => setShowResumeBanner(false), 6000);
     }
 
-    // Detect audio tracks (audioTracks API not in standard TS lib — use any)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const at = (v as any).audioTracks as { length: number; [i: number]: { id: string; label: string; language: string; enabled: boolean } } | undefined;
-    if (at && at.length > 1) {
-      const tracks = Array.from({ length: at.length }, (_, i) => ({
-        id: at[i].id || String(i),
-        label: at[i].label || at[i].language || `Pista ${i + 1}`,
-        language: at[i].language || '',
-      }));
-      setAudioTracks(tracks);
-      const activeIdx = Array.from({ length: at.length }, (_, i) => at[i].enabled).findIndex(Boolean);
-      setActiveAudio(tracks[activeIdx >= 0 ? activeIdx : 0]?.id ?? null);
-    }
-
-    void v.play().catch(() => {});
+    // Try to play with sound; if browser blocks autoplay, fall back to muted
+    void v.play().catch(() => {
+      v.muted = true;
+      setMuted(true);
+      void v.play().catch(() => {});
+    });
   };
 
   const onVideoTimeUpdate = () => {
@@ -440,16 +435,11 @@ export function VideoPlayer({
   };
 
   // ── audio track selection ──────────────────────────────────────────────────
-  const selectAudioTrack = (id: string) => {
+  const selectAudioTrack = (index: number) => {
     const v = videoRef.current;
-    if (!v) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const at = (v as any).audioTracks as { length: number; [i: number]: { id: string; enabled: boolean } } | undefined;
-    if (!at) return;
-    for (let i = 0; i < at.length; i++) {
-      at[i].enabled = at[i].id === id || String(i) === id;
-    }
-    setActiveAudio(id);
+    const currentTime = v?.currentTime ?? 0;
+    setActiveAudio(index);
+    setActiveSrc(buildAudioStreamUrl(movieId, index, currentTime));
     setShowAudioMenu(false);
   };
 
@@ -513,7 +503,8 @@ export function VideoPlayer({
       {/* ── Video element ─── */}
       <video
         ref={videoRef}
-        src={src}
+        src={activeSrc}
+        muted={muted}
         className="h-full w-full object-contain"
         playsInline
         preload="auto"
@@ -762,7 +753,7 @@ export function VideoPlayer({
                 )}
               </div>
 
-              {/* Audio tracks — only shown if > 1 track */}
+              {/* Audio tracks — only shown if > 1 track detected by ffprobe */}
               {audioTracks.length > 1 && (
                 <div className="relative">
                   <CtrlBtn
@@ -775,7 +766,7 @@ export function VideoPlayer({
                   {showAudioMenu && (
                     <AudioMenu
                       tracks={audioTracks}
-                      activeId={activeAudio}
+                      activeIndex={activeAudio}
                       onSelect={selectAudioTrack}
                     />
                   )}
@@ -1033,11 +1024,11 @@ function SubtitleMenu({
 }
 
 function AudioMenu({
-  tracks, activeId, onSelect,
+  tracks, activeIndex, onSelect,
 }: {
-  tracks: { id: string; label: string; language: string }[];
-  activeId: string | null;
-  onSelect: (id: string) => void;
+  tracks: AudioTrackInfo[];
+  activeIndex: number;
+  onSelect: (index: number) => void;
 }) {
   return (
     <motion.div
@@ -1048,10 +1039,10 @@ function AudioMenu({
       <p className="border-b border-netflix-border px-3 py-2 text-xs font-bold uppercase tracking-wide text-netflix-muted">Audio</p>
       {tracks.map(t => (
         <button
-          key={t.id}
+          key={t.index}
           type="button"
-          onClick={() => onSelect(t.id)}
-          className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-white/10 ${activeId === t.id ? 'text-netflix-red font-semibold' : 'text-white'}`}
+          onClick={() => onSelect(t.index)}
+          className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-white/10 ${activeIndex === t.index ? 'text-netflix-red font-semibold' : 'text-white'}`}
         >
           {t.label}
         </button>

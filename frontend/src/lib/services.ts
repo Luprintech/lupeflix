@@ -274,6 +274,15 @@ export function buildStreamUrl(movieId: number): string {
 
 // ── SUBTITLES ──
 
+export function getAudioTracks(movieId: number): Promise<import('../types').AudioTrackInfo[]> {
+  return request(`/api/stream/${movieId}/audio-tracks`);
+}
+
+export function buildAudioStreamUrl(movieId: number, audioIndex: number, startTime = 0): string {
+  const token = getToken();
+  return `/stream/${movieId}?audio=${audioIndex}&t=${Math.floor(startTime)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+}
+
 export function getLocalSubtitles(movieId: number): Promise<import('../types').SubtitleTrack[]> {
   return request(`/api/subtitles/${movieId}/local`);
 }
