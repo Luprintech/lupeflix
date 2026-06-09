@@ -179,16 +179,17 @@ export function VideoPlayer({
       setTimeout(() => setShowResumeBanner(false), 6000);
     }
 
-    // Detect audio tracks
-    const at = (v as HTMLVideoElement & { audioTracks?: AudioTrackList }).audioTracks;
+    // Detect audio tracks (audioTracks API not in standard TS lib — use any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const at = (v as any).audioTracks as { length: number; [i: number]: { id: string; label: string; language: string; enabled: boolean } } | undefined;
     if (at && at.length > 1) {
-      const tracks = Array.from({ length: at.length }, (_, i) => {
-        const t = at[i] as AudioTrack & { id: string; label: string; language: string };
-        return { id: t.id || String(i), label: t.label || t.language || `Pista ${i + 1}`, language: t.language || '' };
-      });
+      const tracks = Array.from({ length: at.length }, (_, i) => ({
+        id: at[i].id || String(i),
+        label: at[i].label || at[i].language || `Pista ${i + 1}`,
+        language: at[i].language || '',
+      }));
       setAudioTracks(tracks);
-      const enabled = Array.from({ length: at.length }, (_, i) => (at[i] as AudioTrack & { enabled: boolean }).enabled);
-      const activeIdx = enabled.findIndex(Boolean);
+      const activeIdx = Array.from({ length: at.length }, (_, i) => at[i].enabled).findIndex(Boolean);
       setActiveAudio(tracks[activeIdx >= 0 ? activeIdx : 0]?.id ?? null);
     }
 
@@ -442,11 +443,11 @@ export function VideoPlayer({
   const selectAudioTrack = (id: string) => {
     const v = videoRef.current;
     if (!v) return;
-    const at = (v as HTMLVideoElement & { audioTracks?: AudioTrackList }).audioTracks;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const at = (v as any).audioTracks as { length: number; [i: number]: { id: string; enabled: boolean } } | undefined;
     if (!at) return;
     for (let i = 0; i < at.length; i++) {
-      const t = at[i] as AudioTrack & { id: string; enabled: boolean };
-      t.enabled = t.id === id || String(i) === id;
+      at[i].enabled = at[i].id === id || String(i) === id;
     }
     setActiveAudio(id);
     setShowAudioMenu(false);
