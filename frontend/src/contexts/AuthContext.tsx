@@ -107,6 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStoredUser(JSON.stringify(newUser));
       setTokenState(newToken);
       setUser(newUser);
+      // Reset isAdmin immediately so a previous admin session never leaks into a new user.
+      setIsAdmin(false);
+      try { localStorage.setItem('lupeflix_is_admin', 'false'); } catch { /* ignore */ }
       void resolveAdmin(newUser.email);
     },
     [resolveAdmin]
