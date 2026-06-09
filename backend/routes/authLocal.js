@@ -148,7 +148,7 @@ router.get('/me', (req, res) => {
     clearSessionCookie(res);
     return res.status(401).json({ error: 'Invalid token' });
   }
-  const user = db.prepare('SELECT id, name, email, role, avatar_color, created_at, email_verified FROM users WHERE email = ?').get(session.user_email);
+  const user = db.prepare('SELECT id, name, email, role, created_at, email_verified FROM users WHERE email = ?').get(session.user_email);
   if (!user) return res.status(401).json({ error: 'User not found' });
   res.json({ token, user: publicUser(user) });
 });
