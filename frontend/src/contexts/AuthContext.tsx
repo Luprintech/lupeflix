@@ -46,8 +46,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { allowed } = await checkAdmin(email);
       setIsAdmin(allowed);
       try { localStorage.setItem('lupeflix_is_admin', allowed ? 'true' : 'false'); } catch { /* ignore */ }
-    } catch {
-      // Network error: keep the cached value, don't downgrade admin status.
+    } catch (err) {
+      // 403 = server definitively says "not admin" — always downgrade.
+      // Network / 5xx errors: keep cached value so admin doesn't get locked out offline.
+      const is403 = err instanceof ApiError && err.status === 403;
+      if (is403) {
+        setIsAdmin(false);
+        try { localStorage.setItem('lupeflix_is_admin', 'false'); } catch { /* ignore */ }
+      }
     }
   }, []);
 
