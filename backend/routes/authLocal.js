@@ -153,6 +153,45 @@ router.get('/me', (req, res) => {
   res.json({ token, user: publicUser(user) });
 });
 
+// POST /api/auth/change-password
+router.post('/change-password', (req, res) => {
+  const token = requestToken(req);
+  if (!token) return res.status(401).json({ error: 'No autenticado' });
+
+  const session = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  if (!session) return res.status(401).json({ error: 'Sesión inválida' });
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(session.user_email);
+  if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
+
+  if (String(user.password || '').startsWith('google:')) {
+    return res.status(400).json({ error: 'Las cuentas de Google no tienen contraseña en LupeFlix' });
+  }
+
+  const { current_password, new_password } = req.body || {};
+  if (!current_password || !new_password) return res.status(400).json({ error: 'Faltan campos' });
+  if (String(new_password).length < 6) return res.status(400).json({ error: 'La contraseña nueva debe tener al menos 6 caracteres' });
+  if (user.password !== current_password) return res.status(403).json({ error: 'La contraseña actual no es correcta' });
+
+  db.prepare('UPDATE users SET password = ? WHERE email = ?').run(new_password, user.email);
+  res.json({ ok: true });
+});
+
+// DELETE /api/auth/account
+router.delete('/account', (req, res) => {
+  const token = requestToken(req);
+  if (!token) return res.status(401).json({ error: 'No autenticado' });
+
+  const session = db.prepare('SELECT * FROM sessions WHERE token = ?').get(token);
+  if (!session) return res.status(401).json({ error: 'Sesión inválida' });
+
+  const email = session.user_email;
+  db.prepare('DELETE FROM sessions WHERE user_email = ?').run(email);
+  db.prepare('DELETE FROM users WHERE email = ?').run(email);
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
 // GET /api/auth/config
 router.get('/config', (req, res) => {
   res.json({ google_client_id: process.env.GOOGLE_CLIENT_ID || null });

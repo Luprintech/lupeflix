@@ -1,16 +1,48 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
-import { getHistory, deleteHistory } from '../lib/services';
+import { getHistory, deleteHistory, changePassword, deleteAccount } from '../lib/services';
 import { tmdbPoster } from '../lib/tmdb';
 import { PosterGridSkeleton } from '../components/ui/Skeleton';
 import type { WatchHistory } from '../types';
 
 export function ProfilePage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const { openCard } = useModal();
   const qc = useQueryClient();
+
+  // ── change password ─────────────────────────────────────────────────────────
+  const [showPwForm, setShowPwForm]   = useState(false);
+  const [currentPw,  setCurrentPw]   = useState('');
+  const [newPw,      setNewPw]       = useState('');
+  const [confirmPw,  setConfirmPw]   = useState('');
+
+  const changePw = useMutation({
+    mutationFn: () => changePassword(currentPw, newPw),
+    onSuccess: () => {
+      toast.success('Contraseña actualizada');
+      setShowPwForm(false);
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleChangePw = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPw !== confirmPw) { toast.error('Las contraseñas nuevas no coinciden'); return; }
+    changePw.mutate();
+  };
+
+  // ── delete account ──────────────────────────────────────────────────────────
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const deleteMut = useMutation({
+    mutationFn: deleteAccount,
+    onSuccess: () => { toast.success('Cuenta eliminada'); logout(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const { data: history, isLoading } = useQuery({
     queryKey: ['history'],
@@ -51,6 +83,105 @@ export function ProfilePage() {
           )}
         </div>
       </header>
+
+      {/* ── Account settings ── */}
+      <section className="mb-10 space-y-3">
+        <h2 className="mb-4 text-xl font-bold text-white">Cuenta</h2>
+
+        {/* Change password */}
+        <div className="rounded-lg border border-netflix-border bg-netflix-surface p-4">
+          <button
+            type="button"
+            onClick={() => setShowPwForm(v => !v)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span className="font-semibold text-white">Cambiar contraseña</span>
+            <svg viewBox="0 0 24 24" className={`h-5 w-5 text-netflix-muted transition-transform ${showPwForm ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {showPwForm && (
+            <form onSubmit={handleChangePw} className="mt-4 space-y-3">
+              <input
+                type="password"
+                placeholder="Contraseña actual"
+                value={currentPw}
+                onChange={e => setCurrentPw(e.target.value)}
+                required
+                className="w-full rounded border border-netflix-border bg-netflix-bg px-3 py-2 text-sm text-white placeholder:text-netflix-muted focus:border-white focus:outline-none"
+              />
+              <input
+                type="password"
+                placeholder="Nueva contraseña"
+                value={newPw}
+                onChange={e => setNewPw(e.target.value)}
+                required
+                minLength={6}
+                className="w-full rounded border border-netflix-border bg-netflix-bg px-3 py-2 text-sm text-white placeholder:text-netflix-muted focus:border-white focus:outline-none"
+              />
+              <input
+                type="password"
+                placeholder="Confirmar nueva contraseña"
+                value={confirmPw}
+                onChange={e => setConfirmPw(e.target.value)}
+                required
+                className="w-full rounded border border-netflix-border bg-netflix-bg px-3 py-2 text-sm text-white placeholder:text-netflix-muted focus:border-white focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={changePw.isPending}
+                  className="rounded bg-netflix-red px-4 py-2 text-sm font-bold text-white disabled:opacity-60 hover:bg-netflix-red2"
+                >
+                  {changePw.isPending ? 'Guardando…' : 'Guardar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowPwForm(false); setCurrentPw(''); setNewPw(''); setConfirmPw(''); }}
+                  className="rounded border border-netflix-border px-4 py-2 text-sm text-netflix-muted hover:text-white"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Delete account */}
+        <div className="rounded-lg border border-red-900/50 bg-netflix-surface p-4">
+          <p className="mb-3 font-semibold text-white">Eliminar cuenta</p>
+          <p className="mb-4 text-sm text-netflix-muted">Esta acción es permanente y no se puede deshacer. Se borrarán todos tus datos.</p>
+          {!confirmDelete ? (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="rounded border border-red-700 px-4 py-2 text-sm font-bold text-red-400 transition-colors hover:bg-red-900/30"
+            >
+              Eliminar mi cuenta
+            </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-white">¿Estás seguro/a?</span>
+              <button
+                type="button"
+                onClick={() => deleteMut.mutate()}
+                disabled={deleteMut.isPending}
+                className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60 hover:bg-red-600"
+              >
+                {deleteMut.isPending ? 'Eliminando…' : 'Sí, eliminar'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="rounded border border-netflix-border px-4 py-2 text-sm text-netflix-muted hover:text-white"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
 
       <h2 className="mb-4 text-xl font-bold text-white">Historial</h2>
       {isLoading ? (

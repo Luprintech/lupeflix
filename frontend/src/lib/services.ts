@@ -197,6 +197,17 @@ export function logout(): Promise<{ ok: boolean }> {
   return request('/api/auth/logout', { method: 'POST' });
 }
 
+export function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean }> {
+  return request('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
+export function deleteAccount(): Promise<{ ok: boolean }> {
+  return request('/api/auth/account', { method: 'DELETE' });
+}
+
 export function checkAdmin(email: string): Promise<{ allowed: boolean }> {
   return request<{ allowed: boolean }>('/api/admin/check', {
     headers: { 'x-user-email': email },
