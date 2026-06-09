@@ -215,6 +215,7 @@ router.get('/:id/opensubtitles', async (req, res) => {
       headers: {
         'Api-Key': process.env.OPENSUBTITLES_KEY,
         'Content-Type': 'application/json',
+        'User-Agent': 'LupeFlix v1.0.0',
       },
     });
 
@@ -259,6 +260,7 @@ router.post('/:id/download', async (req, res) => {
       headers: {
         'Api-Key': process.env.OPENSUBTITLES_KEY,
         'Content-Type': 'application/json',
+        'User-Agent': 'LupeFlix v1.0.0',
       },
       body: JSON.stringify({ file_id }),
     });

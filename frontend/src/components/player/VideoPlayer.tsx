@@ -109,6 +109,9 @@ export function VideoPlayer({
   const [nextEpData,  setNextEpData]  = useState<{ id: number; title: string } | null>(null);
   const [nextEpCountdown, setNextEpCountdown] = useState(5);
   const [skipRipple,  setSkipRipple]  = useState<SkipRipple | null>(null);
+  const [audioTracks, setAudioTracks] = useState<{ id: string; label: string; language: string }[]>([]);
+  const [activeAudio, setActiveAudio] = useState<string | null>(null);
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
   // For double-tap detection on mobile
   const lastTapRef  = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
 
@@ -175,6 +178,20 @@ export function VideoPlayer({
       setShowResumeBanner(true);
       setTimeout(() => setShowResumeBanner(false), 6000);
     }
+
+    // Detect audio tracks
+    const at = (v as HTMLVideoElement & { audioTracks?: AudioTrackList }).audioTracks;
+    if (at && at.length > 1) {
+      const tracks = Array.from({ length: at.length }, (_, i) => {
+        const t = at[i] as AudioTrack & { id: string; label: string; language: string };
+        return { id: t.id || String(i), label: t.label || t.language || `Pista ${i + 1}`, language: t.language || '' };
+      });
+      setAudioTracks(tracks);
+      const enabled = Array.from({ length: at.length }, (_, i) => (at[i] as AudioTrack & { enabled: boolean }).enabled);
+      const activeIdx = enabled.findIndex(Boolean);
+      setActiveAudio(tracks[activeIdx >= 0 ? activeIdx : 0]?.id ?? null);
+    }
+
     void v.play().catch(() => {});
   };
 
@@ -419,6 +436,20 @@ export function VideoPlayer({
       });
       lastTapRef.current = { time: now, x: touch.clientX };
     }
+  };
+
+  // ── audio track selection ──────────────────────────────────────────────────
+  const selectAudioTrack = (id: string) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const at = (v as HTMLVideoElement & { audioTracks?: AudioTrackList }).audioTracks;
+    if (!at) return;
+    for (let i = 0; i < at.length; i++) {
+      const t = at[i] as AudioTrack & { id: string; enabled: boolean };
+      t.enabled = t.id === id || String(i) === id;
+    }
+    setActiveAudio(id);
+    setShowAudioMenu(false);
   };
 
   // ── subtitle management ────────────────────────────────────────────────────
@@ -714,7 +745,7 @@ export function VideoPlayer({
               {/* Subtitles */}
               <div className="relative">
                 <CtrlBtn
-                  onClick={() => { setShowSubMenu(s => !s); setShowSettings(false); }}
+                  onClick={() => { setShowSubMenu(s => !s); setShowSettings(false); setShowAudioMenu(false); }}
                   label="Subtítulos"
                   active={activeSub !== null}
                 >
@@ -730,11 +761,31 @@ export function VideoPlayer({
                 )}
               </div>
 
+              {/* Audio tracks — only shown if > 1 track */}
+              {audioTracks.length > 1 && (
+                <div className="relative">
+                  <CtrlBtn
+                    onClick={() => { setShowAudioMenu(s => !s); setShowSubMenu(false); setShowSettings(false); }}
+                    label="Idioma de audio"
+                    active={showAudioMenu}
+                  >
+                    <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6zm-2 16a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
+                  </CtrlBtn>
+                  {showAudioMenu && (
+                    <AudioMenu
+                      tracks={audioTracks}
+                      activeId={activeAudio}
+                      onSelect={selectAudioTrack}
+                    />
+                  )}
+                </div>
+              )}
+
               {/* Speed */}
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => { setShowSettings(s => !s); setShowSubMenu(false); }}
+                  onClick={() => { setShowSettings(s => !s); setShowSubMenu(false); setShowAudioMenu(false); }}
                   className={`rounded px-2 py-1 text-xs font-bold transition-colors hover:text-white ${speed !== 1 ? 'text-netflix-red' : 'text-white/70'}`}
                   title="Velocidad"
                 >
@@ -976,6 +1027,34 @@ function SubtitleMenu({
           + Buscar en OpenSubtitles
         </button>
       </div>
+    </motion.div>
+  );
+}
+
+function AudioMenu({
+  tracks, activeId, onSelect,
+}: {
+  tracks: { id: string; label: string; language: string }[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="absolute bottom-12 right-0 z-50 min-w-[180px] rounded-lg border border-netflix-border bg-netflix-surface shadow-xl"
+    >
+      <p className="border-b border-netflix-border px-3 py-2 text-xs font-bold uppercase tracking-wide text-netflix-muted">Audio</p>
+      {tracks.map(t => (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onSelect(t.id)}
+          className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-white/10 ${activeId === t.id ? 'text-netflix-red font-semibold' : 'text-white'}`}
+        >
+          {t.label}
+        </button>
+      ))}
     </motion.div>
   );
 }
