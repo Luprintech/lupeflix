@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import type { Movie } from '../../types';
-import { Card } from '../ui/Card';
+import { HoverCard } from '../ui/HoverCard';
 
 interface ContentRowProps {
   title: string;
@@ -78,6 +78,8 @@ export function ContentRow({
           <ChevronLeft />
         </button>
 
+        {/* overflow-hidden is on the Embla root — the hover portal renders via
+            createPortal to document.body so it's never clipped here. */}
         <div ref={emblaRef} className="overflow-hidden">
           <div className="flex gap-3 px-4 md:px-12">
             {items.map((m) => (
@@ -85,7 +87,7 @@ export function ContentRow({
                 key={`${m.id}-${m.series_key ?? ''}`}
                 className="w-28 shrink-0 sm:w-36 md:w-44"
               >
-                <Card
+                <HoverCard
                   movie={m}
                   isSeries={isSeries}
                   showRating={showRating}

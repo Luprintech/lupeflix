@@ -50,4 +50,4 @@ async function sendVerificationEmail({ req, email, name, token }) {
   return { sent: true, verifyUrl };
 }
 
-module.exports = { sendVerificationEmail };
+module.exports = { sendVerificationEmail, smtpConfigured };

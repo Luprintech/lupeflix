@@ -69,10 +69,15 @@ export function LoginPage() {
     try {
       if (mode === 'register') {
         const res = await registerWithPassword(name, email, password);
-        if (res.verification_required) {
+        if (!res.verification_required && res.token && res.user) {
+          // SMTP not configured: account created and verified immediately.
+          toast.success('Cuenta creada. ¡Bienvenido/a!');
+          login(res.token, res.user);
+          navigate('/home', { replace: true });
+        } else {
           toast.success(res.email_sent
-            ? 'Te hemos enviado un correo de verificación.'
-            : 'Cuenta creada. Revisa el enlace de verificación en los logs del servidor.');
+            ? 'Te hemos enviado un correo de verificación. Revisa tu bandeja de entrada.'
+            : 'Verifica el enlace de verificación en los logs del servidor.');
           setMode('login');
           setPassword('');
         }

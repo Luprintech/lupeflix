@@ -33,20 +33,37 @@ export function SeriesModal({ seriesKey, onClose, onPlay }: SeriesModalProps) {
 
   const refresh = useMutation({
     mutationFn: () => refreshSeriesMetadata(seriesKey as string),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Populate the cache directly with the fresh data returned by the endpoint
+      // so episodes titles and posters update immediately without a second round-trip.
+      if (data?.series) {
+        qc.setQueryData(['series', seriesKey], data.series);
+        if (data.series.series_key && data.series.series_key !== seriesKey) {
+          qc.setQueryData(['series', data.series.series_key], data.series);
+        }
+      }
+      void qc.invalidateQueries({ queryKey: ['series'] });
       toast.success('Metadatos de la serie actualizados');
-      void qc.invalidateQueries({ queryKey: ['series', seriesKey] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const identify = useMutation({
     mutationFn: (tmdbId: number) => setSeriesTmdb(seriesKey as string, tmdbId),
-    onSuccess: () => {
-      toast.success('Portada y metadatos de serie actualizados');
+    onSuccess: (data) => {
+      // Use the response data directly — the series_title (and therefore
+      // series_key) may have changed to the TMDB canonical name. Populate
+      // BOTH the old and new keys so the modal stays in sync instantly.
+      if (data?.series) {
+        qc.setQueryData(['series', seriesKey], data.series);
+        if (data.series.series_key && data.series.series_key !== seriesKey) {
+          qc.setQueryData(['series', data.series.series_key], data.series);
+        }
+      }
       setIdentifyOpen(false);
       setResults([]);
       void qc.invalidateQueries({ queryKey: ['series'] });
+      toast.success('Portada y metadatos de serie actualizados');
     },
     onError: (e: Error) => toast.error(e.message),
   });

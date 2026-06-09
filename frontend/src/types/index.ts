@@ -211,3 +211,27 @@ export interface TmdbSearchResponse {
 }
 
 export type ListType = 'favorite' | 'watchlist';
+
+// ── Player / Subtitles ────────────────────────────────────────────────────────
+
+export interface SubtitleTrack {
+  lang: string;
+  label: string;
+  file: string;   // base64-encoded absolute path, used in /api/subtitles/:id/serve
+  format: 'vtt' | 'srt' | 'ass';
+}
+
+export interface OsSearchResult {
+  file_id: number | null;
+  language: string;
+  filename: string;
+  download_count: number;
+  upload_date: string;
+  hearing_impaired: boolean;
+}
+
+export interface OsSearchResponse {
+  available: boolean;
+  message?: string;
+  results?: OsSearchResult[];
+}

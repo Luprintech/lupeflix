@@ -133,7 +133,7 @@ export function ProvidersSection({ providers, title }: { providers: ProviderSumm
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-netflix-muted">{label}</p>
             <div className="flex flex-wrap gap-2">
               {list.map((provider) => (
-                <ProviderLink key={`${label}-${provider.id}`} provider={provider} title={title} fallback={providers.link} />
+                <ProviderLink key={`${label}-${provider.id}`} provider={provider} title={title} justwatchLink={providers.link} />
               ))}
             </div>
           </div>
@@ -143,18 +143,17 @@ export function ProvidersSection({ providers, title }: { providers: ProviderSumm
   );
 }
 
-function ProviderLink({ provider, title, fallback }: { provider: Provider; title: string; fallback: string | null }) {
-  const href = providerWatchUrl(provider.name, title, fallback);
-  const content = (
-    <>
+function ProviderLink({ provider, title, justwatchLink }: { provider: Provider; title: string; justwatchLink: string | null }) {
+  // providerWatchUrl always returns a string: the JustWatch content URL when available,
+  // otherwise a JustWatch title search. Never a platform search/login page.
+  const href = providerWatchUrl(provider.name, title, justwatchLink);
+  const className = "inline-flex items-center gap-2 rounded-full border border-netflix-border bg-netflix-surface2 px-3 py-1.5 text-sm text-white transition-colors hover:border-white";
+  return (
+    <a className={className} href={href} target="_blank" rel="noreferrer" title={`Ver "${title}" en ${provider.name}`}>
       {provider.logo_path && <img src={tmdbImg(provider.logo_path, 'w45')} alt="" className="h-6 w-6 rounded" />}
       <span>{provider.name}</span>
-    </>
+    </a>
   );
-  const className = "inline-flex items-center gap-2 rounded-full border border-netflix-border bg-netflix-surface2 px-3 py-1.5 text-sm text-white transition-colors hover:border-white";
-
-  if (!href) return <span className={className}>{content}</span>;
-  return <a className={className} href={href} target="_blank" rel="noreferrer">{content}</a>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

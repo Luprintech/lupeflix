@@ -33,7 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { return JSON.parse(cached) as User; } catch { return null; }
   });
   const [token, setTokenState] = useState<string | null>(initialToken);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Restore isAdmin from the last known value to avoid a flash of hidden admin UI.
+  const [isAdmin, setIsAdmin] = useState(() => {
+    try { return localStorage.getItem('lupeflix_is_admin') === 'true'; } catch { return false; }
+  });
   // isLoading is false immediately if we already have a token (optimistic).
   // We still validate in the background; only an explicit 401 kicks the user out.
   const [isLoading, setIsLoading] = useState(!initialToken);
@@ -42,8 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { allowed } = await checkAdmin(email);
       setIsAdmin(allowed);
+      try { localStorage.setItem('lupeflix_is_admin', allowed ? 'true' : 'false'); } catch { /* ignore */ }
     } catch {
-      setIsAdmin(false);
+      // Network error: keep the cached value, don't downgrade admin status.
     }
   }, []);
 
@@ -111,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     void logoutRequest().catch(() => undefined);
     clearToken();
+    try { localStorage.removeItem('lupeflix_is_admin'); } catch { /* ignore */ }
     setUser(null);
     setTokenState(null);
     setIsAdmin(false);

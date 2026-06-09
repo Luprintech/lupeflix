@@ -1,6 +1,7 @@
 ﻿import { motion } from 'framer-motion';
 import type { Movie } from '../../types';
 import { Card } from './Card';
+import { HoverCard } from './HoverCard';
 import type { CatalogView, PosterSize } from './CatalogControls';
 
 interface MovieGridProps {
@@ -50,14 +51,24 @@ export function MovieGrid({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: Math.min(i * 0.02, 0.4) }}
         >
-          <Card
-            movie={m}
-            isSeries={isSeries}
-            showRating={showRating}
-            variant={listMode ? 'list' : 'poster'}
-            compact={view === 'compact'}
-            onClick={() => onCardClick(m)}
-          />
+          {/* List view and compact grid don't benefit from hover preview */}
+          {listMode || view === 'compact' ? (
+            <Card
+              movie={m}
+              isSeries={isSeries}
+              showRating={showRating}
+              variant={listMode ? 'list' : 'poster'}
+              compact={view === 'compact'}
+              onClick={() => onCardClick(m)}
+            />
+          ) : (
+            <HoverCard
+              movie={m}
+              isSeries={isSeries}
+              showRating={showRating}
+              onClick={() => onCardClick(m)}
+            />
+          )}
         </motion.div>
       ))}
     </div>

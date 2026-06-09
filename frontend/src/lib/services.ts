@@ -173,7 +173,7 @@ export function registerWithPassword(
   name: string,
   email: string,
   password: string
-): Promise<{ ok: boolean; verification_required: boolean; email_sent: boolean }> {
+): Promise<{ ok: boolean; verification_required: boolean; email_sent?: boolean; token?: string; user?: User }> {
   return request('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({ name, email, password }),
@@ -259,4 +259,36 @@ export function buildStreamUrl(movieId: number): string {
   const token = getToken();
   const base = `/stream/${movieId}`;
   return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
+
+// ── SUBTITLES ──
+
+export function getLocalSubtitles(movieId: number): Promise<import('../types').SubtitleTrack[]> {
+  return request(`/api/subtitles/${movieId}/local`);
+}
+
+export function buildSubtitleUrl(movieId: number, fileBase64: string): string {
+  return `/api/subtitles/${movieId}/serve?file=${encodeURIComponent(fileBase64)}`;
+}
+
+export function searchOpenSubtitles(movieId: number, lang: string): Promise<import('../types').OsSearchResponse> {
+  return request(`/api/subtitles/${movieId}/opensubtitles?lang=${encodeURIComponent(lang)}`);
+}
+
+export function downloadSubtitle(movieId: number, fileId: number, lang: string): Promise<string> {
+  // Returns VTT text directly (text/vtt response)
+  return fetch(`/api/subtitles/${movieId}/download`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ file_id: fileId, lang }),
+  }).then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
+  });
+}
+
+// ── NEXT EPISODE ──
+
+export function getNextEpisode(movieId: number): Promise<{ next: import('../types').Movie | null }> {
+  return request(`/api/movies/${movieId}/next`);
 }

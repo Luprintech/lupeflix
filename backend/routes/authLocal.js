@@ -2,7 +2,7 @@
 const router = express.Router();
 const crypto = require('crypto');
 const db = require('../db');
-const { sendVerificationEmail } = require('../mailer');
+const { sendVerificationEmail, smtpConfigured } = require('../mailer');
 
 function makeToken() { return crypto.randomBytes(32).toString('hex'); }
 
@@ -65,6 +65,26 @@ router.post('/register', async (req, res) => {
   const existing = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(cleanEmail);
   if (existing?.email_verified) return res.status(409).json({ error: 'Email ya registrado' });
 
+  // If no SMTP is configured, create the account already verified — no email flow needed.
+  if (!smtpConfigured()) {
+    if (existing) {
+      db.prepare(`
+        UPDATE users
+        SET name = ?, password = ?, email_verified = 1, verification_token = NULL
+        WHERE email = ?
+      `).run(cleanName, password, cleanEmail);
+    } else {
+      db.prepare(`
+        INSERT INTO users (name, email, password, role, email_verified)
+        VALUES (?,?,?,?,1)
+      `).run(cleanName, cleanEmail, password, 'user');
+    }
+    const token = createSession(req, res, cleanEmail);
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+    return res.json({ ok: true, verification_required: false, token, user: publicUser(user) });
+  }
+
+  // SMTP is configured — use email verification flow.
   const verificationToken = makeToken();
   if (existing) {
     db.prepare(`

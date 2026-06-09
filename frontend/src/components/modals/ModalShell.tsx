@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
@@ -30,11 +30,17 @@ interface ModalShellProps {
 }
 
 export function ModalShell({ open, onClose, children, maxWidth = 'max-w-4xl' }: ModalShellProps) {
-  // Lock body scroll + close on Escape while open.
+  // Keep onClose in a ref so the Escape handler is always current
+  // without adding it to the effect's dependency array.
+  // Removing onClose from deps prevents the effect from re-running (and
+  // briefly unlocking scroll) every time the parent re-renders.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     lockBodyScroll();
@@ -42,7 +48,7 @@ export function ModalShell({ open, onClose, children, maxWidth = 'max-w-4xl' }: 
       document.removeEventListener('keydown', onKey);
       unlockBodyScroll();
     };
-  }, [open, onClose]);
+  }, [open]); // intentionally exclude onClose — handled via ref above
 
   return (
     <AnimatePresence>

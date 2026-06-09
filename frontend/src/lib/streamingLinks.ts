@@ -1,17 +1,23 @@
-﻿export function providerWatchUrl(providerName: string, title: string, fallback?: string | null): string | null {
-  const q = encodeURIComponent(title);
-  const normalized = providerName.toLowerCase();
-
-  if (normalized.includes('netflix')) return `https://www.netflix.com/search?q=${q}`;
-  if (normalized.includes('prime') || normalized.includes('amazon')) return `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${q}`;
-  if (normalized.includes('disney')) return `https://www.disneyplus.com/search?q=${q}`;
-  if (normalized.includes('hbo') || normalized.includes('max')) return `https://play.max.com/search?q=${q}`;
-  if (normalized.includes('apple')) return `https://tv.apple.com/search?term=${q}`;
-  if (normalized.includes('filmin')) return `https://www.filmin.es/buscar?search=${q}`;
-  if (normalized.includes('movistar')) return `https://ver.movistarplus.es/buscar?term=${q}`;
-  if (normalized.includes('rakuten')) return `https://rakuten.tv/es/search?q=${q}`;
-  if (normalized.includes('skyshowtime')) return `https://www.skyshowtime.com/es/search?q=${q}`;
-  if (normalized.includes('crunchyroll')) return `https://www.crunchyroll.com/search?q=${q}`;
-
-  return fallback || null;
+﻿/**
+ * Returns the best URL to watch a specific title on a provider.
+ *
+ * Priority:
+ *  1. `justwatchLink` — the TMDB-provided JustWatch URL for this exact content.
+ *     It goes to the specific content page on JustWatch, which has properly
+ *     deep-linked "Watch on [Platform]" buttons. This is the only URL that
+ *     reliably opens the content (not just a login screen).
+ *  2. JustWatch title search — a cross-platform search, still better than
+ *     opening a platform's own search/login page.
+ *
+ * Note: platform-specific search URLs (e.g. netflix.com/search?q=...) are
+ * intentionally NOT used — they display the platform's login page for
+ * unauthenticated users and don't link to the specific content even when logged in.
+ */
+export function providerWatchUrl(
+  _providerName: string,
+  title: string,
+  justwatchLink?: string | null,
+): string {
+  if (justwatchLink) return justwatchLink;
+  return `https://www.justwatch.com/es/buscar?q=${encodeURIComponent(title)}`;
 }

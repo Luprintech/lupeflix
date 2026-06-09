@@ -41,8 +41,15 @@ export function MetadataModal({
   const apply = useMutation({
     mutationFn: (r: TmdbSearchResult) => identifyMovie(movieId, r.id, type, type),
     onSuccess: (res) => {
-      toast.success(`Identificado: ${res.title}`);
-      void qc.invalidateQueries();
+      toast.success(`Identificado: ${res.title ?? 'OK'}`);
+      // Invalidate the specific movie query so the modal refreshes immediately,
+      // then invalidate lists (home rows, grid) so cards update too.
+      void qc.invalidateQueries({ queryKey: ['movie', movieId] });
+      void qc.invalidateQueries({ queryKey: ['extras', movieId] });
+      void qc.invalidateQueries({ queryKey: ['movies'] });
+      void qc.invalidateQueries({ queryKey: ['featured'] });
+      void qc.invalidateQueries({ queryKey: ['recent'] });
+      void qc.invalidateQueries({ queryKey: ['top'] });
       onApplied?.();
       onClose();
     },
