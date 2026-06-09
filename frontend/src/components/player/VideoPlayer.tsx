@@ -114,6 +114,7 @@ export function VideoPlayer({
   const [audioTracks, setAudioTracks] = useState<AudioTrackInfo[]>([]);
   const [activeAudio, setActiveAudio] = useState<number>(0);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [showUnmuteBanner, setShowUnmuteBanner] = useState(false);
   // When non-null, player reloads with this src (audio track change)
   const [activeSrc, setActiveSrc] = useState(src);
   // For double-tap detection on mobile
@@ -183,10 +184,11 @@ export function VideoPlayer({
       setTimeout(() => setShowResumeBanner(false), 6000);
     }
 
-    // Try to play with sound; if browser blocks autoplay, fall back to muted
+    // Try to play with sound; if blocked by browser autoplay policy, fall back muted
     void v.play().catch(() => {
       v.muted = true;
       setMuted(true);
+      setShowUnmuteBanner(true);
       void v.play().catch(() => {});
     });
   };
@@ -234,6 +236,11 @@ export function VideoPlayer({
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showNextEp, nextEpData]);
+
+  // ── sync muted state → DOM (React's muted prop is unreliable) ──────────────
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
 
   // ── fullscreen change ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -504,7 +511,6 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         src={activeSrc}
-        muted={muted}
         className="h-full w-full object-contain"
         playsInline
         preload="auto"
@@ -551,6 +557,31 @@ export function VideoPlayer({
           >
             <div className="h-14 w-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Unmute banner (autoplay policy blocked sound) ─── */}
+      <AnimatePresence>
+        {showUnmuteBanner && (
+          <motion.button
+            type="button"
+            key="unmute-banner"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            onClick={() => {
+              const v = videoRef.current;
+              if (v) { v.muted = false; }
+              setMuted(false);
+              setShowUnmuteBanner(false);
+            }}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3 rounded-2xl bg-black/80 px-8 py-6 text-white backdrop-blur-sm hover:bg-black/90 transition-colors cursor-pointer"
+          >
+            <svg viewBox="0 0 24 24" className="h-12 w-12 fill-white/90">
+              <path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+            </svg>
+            <span className="text-base font-bold">Haz clic para activar el sonido</span>
+          </motion.button>
         )}
       </AnimatePresence>
 

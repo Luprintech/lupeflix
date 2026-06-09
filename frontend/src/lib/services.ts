@@ -275,7 +275,7 @@ export function buildStreamUrl(movieId: number): string {
 // ── SUBTITLES ──
 
 export function getAudioTracks(movieId: number): Promise<import('../types').AudioTrackInfo[]> {
-  return request(`/api/stream/${movieId}/audio-tracks`);
+  return request(`/stream/${movieId}/audio-tracks`);
 }
 
 export function buildAudioStreamUrl(movieId: number, audioIndex: number, startTime = 0): string {
