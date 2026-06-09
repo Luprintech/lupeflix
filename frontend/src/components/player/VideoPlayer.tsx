@@ -28,7 +28,6 @@ import {
   buildSubtitleUrl,
   searchOpenSubtitles,
   downloadSubtitle,
-  buildStreamUrl,
   getNextEpisode,
 } from '../../lib/services';
 import type { OsSearchResult, SubtitleTrack } from '../../types';
@@ -95,7 +94,6 @@ export function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [isLoading,   setIsLoading]   = useState(true);
   const [speed,       setSpeed]       = useState(1);
-  const [seeking,     setSeeking]     = useState(false);
   const [seekHover,   setSeekHover]   = useState<{ time: number; x: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showSubMenu,  setShowSubMenu]  = useState(false);
@@ -182,7 +180,7 @@ export function VideoPlayer({
 
   const onVideoTimeUpdate = () => {
     const v = videoRef.current;
-    if (!v || seeking) return;
+    if (!v) return;
     setCurrentTime(v.currentTime);
 
     // Buffered

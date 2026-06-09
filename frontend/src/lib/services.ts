@@ -279,7 +279,7 @@ export function downloadSubtitle(movieId: number, fileId: number, lang: string):
   // Returns VTT text directly (text/vtt response)
   return fetch(`/api/subtitles/${movieId}/download`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}) },
     body: JSON.stringify({ file_id: fileId, lang }),
   }).then(r => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
